@@ -1,0 +1,880 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  LOCAL
+  DISCORD
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+  BANNED
+}
+
+enum CharacterStatus {
+  CIVIL
+  INTERN
+  MEDICAL_STAFF
+  RETIRED
+  SUSPENDED
+}
+
+enum CharacterSex {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  RETIRED
+}
+
+enum OccupationType {
+  DEPARTMENT
+  BUSINESS
+  EMPLOYMENT
+  OTHER
+}
+
+enum ComplaintStatus {
+  PENDING
+  UNDER_INVESTIGATION
+  WAITING_FOR_CITIZEN
+  RESOLVED
+  REJECTED
+  CLOSED
+}
+
+enum ComplaintEvidenceType {
+  IMAGE
+  VIDEO_URL
+}
+
+enum ComplaintEventType {
+  CREATED
+  STATUS_CHANGED
+  INVESTIGATOR_ASSIGNED
+  INVESTIGATOR_REMOVED
+  MESSAGE_SENT
+  INTERNAL_NOTE_ADDED
+  EVIDENCE_ADDED
+  EVIDENCE_REMOVED
+}
+
+enum NewsStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+
+enum GalleryItemStatus {
+  ACTIVE
+  HIDDEN
+}
+
+enum NotificationType {
+  COMPLAINT_CREATED
+  COMPLAINT_MESSAGE
+  COMPLAINT_STATUS
+  COMPLAINT_ASSIGNED
+  DEPARTMENT_OPENING
+  DEPARTMENT_INTEREST_LETTER
+  DEPARTMENT_APPLICATION_ACCEPTED
+  DEPARTMENT_APPLICATION_REJECTED
+  DEPARTMENT_ASSIGNED
+  REPORT_CREATED
+  REPORT_ASSIGNED
+  REPORT_STATUS
+  REPORT_TRANSFERRED
+  REPORT_EVIDENCE
+  REPORT_PARTICIPANT
+  ACADEMY_APPLICATION_SUBMITTED
+  ACADEMY_APPLICATION_ACCEPTED
+  ACADEMY_APPLICATION_REJECTED
+  ACADEMY_TRAINING_CREATED
+  ACADEMY_ANNOUNCEMENT
+  ACADEMY_ATTENDANCE
+  SYSTEM
+}
+
+enum AcademyTrainingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AcademyAttendanceStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+enum AcademyAnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AcademyApplicationType {
+  ACADEMY
+  TRANSFER
+}
+
+enum AcademyApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DepartmentOpeningStatus {
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+enum DepartmentMembershipRole {
+  MEMBER
+  LEAD
+  SUPERVISOR
+}
+
+enum InterestLetterStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  NEEDS_INFO
+}
+
+enum ReportStatus {
+  PENDING
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum ReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReportType {
+  CONSULTATION
+  DIAGNOSTIC
+  PROCEDURE
+  HOSPITALIZATION
+  INTERNAL
+  OTHER
+}
+
+enum ReportEvidenceType {
+  IMAGE
+  VIDEO_URL
+  DOCUMENT
+}
+
+model Account {
+  id                String         @id @default(uuid())
+  email             String?        @unique
+  username          String         @unique
+  displayName       String?
+  status            AccountStatus  @default(ACTIVE)
+  activeCharacterId String?        @unique
+  activeCharacter   Character?     @relation("ActiveCharacter", fields: [activeCharacterId], references: [id], onDelete: SetNull)
+  identities        AuthIdentity[]
+  characters        Character[]    @relation("AccountCharacters")
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]     @relation("AuditActorAccount")
+  notifications     Notification[]
+  licensesAssigned  StaffLicense[] @relation("LicenseAssignedBy")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model AuthIdentity {
+  id                String       @id @default(uuid())
+  accountId         String
+  account           Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  provider          AuthProvider
+  providerAccountId String
+  passwordHash      String?
+  profile           Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([accountId])
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid())
+  accountId    String
+  account      Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+/// Identity inside the RP world. May be civilian or SAED-affiliated.
+model Character {
+  id             String          @id @default(uuid())
+  accountId      String
+  account        Account         @relation("AccountCharacters", fields: [accountId], references: [id], onDelete: Cascade)
+  firstName      String
+  lastName       String
+  birthDate      DateTime?       @db.Date
+  sex            CharacterSex?
+  nationality    String?
+  phone          String?
+  biography      String?
+  avatarUrl      String?
+  status         CharacterStatus @default(CIVIL)
+  /// Optional civilian/display rank. Medical hierarchy lives on StaffProfile.
+  rankId         String?
+  rank           Rank?           @relation(fields: [rankId], references: [id], onDelete: SetNull)
+  fivemCitizenId String?         @unique
+  joinedAt       DateTime?       @db.Date
+  roles          CharacterRole[]
+  staffProfile StaffProfile?
+  occupations    Occupation[]
+  activeFor      Account?        @relation("ActiveCharacter")
+  auditLogs      AuditLog[]      @relation("AuditActorCharacter")
+  complaintsFiled       Complaint[]              @relation("ComplaintComplainant")
+  complaintMessages     ComplaintMessage[]
+  complaintInternalNotes ComplaintInternalNote[]
+  complaintAssignments  ComplaintAssignment[]
+  complaintEvents       ComplaintEvent[]
+  notifications         Notification[]
+  reportsCreated        Report[]                 @relation("ReportCreator")
+  reportTransfers       ReportTransfer[]         @relation("ReportTransferActor")
+  reportEvidenceUploads ReportEvidence[]         @relation("ReportEvidenceUploader")
+  academyTrainingsInstructed AcademyTraining[]   @relation("AcademyTrainingInstructor")
+  academyTrainingsCreated    AcademyTraining[]   @relation("AcademyTrainingCreator")
+  academyAttendances         AcademyTrainingAttendance[]
+  academyAnnouncementsAuthored AcademyAnnouncement[] @relation("AcademyAnnouncementAuthor")
+  academyApplications        AcademyApplication[] @relation("AcademyApplicationApplicant")
+  academyApplicationsReviewed AcademyApplication[] @relation("AcademyApplicationReviewer")
+  newsArticlesAuthored       NewsArticle[]        @relation("NewsArticleAuthor")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([accountId])
+  @@index([rankId])
+  @@index([status])
+}
+
+/// Civilian/agency employment. Independent from StaffProfile (SAED membership).
+model Occupation {
+  id           String          @id @default(uuid())
+  characterId  String
+  character    Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  type         OccupationType  @default(EMPLOYMENT)
+  organization String
+  position     String?
+  isPrimary    Boolean         @default(false)
+  isActive     Boolean         @default(true)
+  startedAt    DateTime?       @db.Date
+  endedAt      DateTime?       @db.Date
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([characterId])
+  @@index([organization])
+  @@index([isActive])
+}
+
+/// Medical/civilian hierarchy catalog. Not authorization (RBAC uses Role).
+model Rank {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  sortOrder   Int              @default(0)
+  isActive    Boolean          @default(true)
+  characters    Character[]
+  staffProfiles StaffProfile[]
+  openings      DepartmentOpening[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Department {
+  id           String               @id @default(uuid())
+  name         String               @unique
+  slug         String               @unique
+  description  String?
+  imageUrl     String?
+  isActive     Boolean              @default(true)
+  staffProfiles StaffProfile[]
+  memberships  StaffDepartment[]
+  supervisors  DepartmentSupervisor[]
+  openings     DepartmentOpening[]
+  interestLetters InterestLetter[]
+  reports      Report[]
+  transfersFrom ReportTransfer[]    @relation("ReportTransferFrom")
+  transfersTo   ReportTransfer[]    @relation("ReportTransferTo")
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+}
+
+/// Many-to-many: a department may have multiple supervisors; a staff member may supervise several departments.
+model DepartmentSupervisor {
+  id               String         @id @default(uuid())
+  departmentId       String
+  department         Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  staffProfileId String
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  assignedAt       DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+
+  @@unique([departmentId, staffProfileId])
+  @@index([staffProfileId])
+}
+
+model DepartmentOpening {
+  id                   String                @id @default(uuid())
+  departmentId           String
+  department             Department              @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  title                String
+  description          String
+  minRankId            String?
+  minRank              Rank?                 @relation(fields: [minRankId], references: [id], onDelete: SetNull)
+  status               DepartmentOpeningStatus @default(OPEN)
+  createdByCharacterId String?
+  openedAt             DateTime              @default(now())
+  closedAt             DateTime?
+  interestLetters      InterestLetter[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([departmentId, status])
+  @@index([minRankId])
+}
+
+model InterestLetter {
+  id                     String               @id @default(uuid())
+  openingId              String
+  opening                DepartmentOpening      @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  departmentId             String
+  department               Department             @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  staffProfileId       String
+  staffProfile         StaffProfile       @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  motivation             String
+  experience             String
+  additionalInfo         String?
+  status                 InterestLetterStatus @default(PENDING)
+  reviewNotes            String?
+  reviewedByCharacterId  String?
+  reviewedAt             DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@unique([openingId, staffProfileId])
+  @@index([departmentId, status])
+  @@index([staffProfileId])
+}
+
+/// Optional SAED membership for a character. Civilians have none.
+/// `employeeNumber` identifies the staff member; `departmentId` is the denormalized primary department (synced from StaffDepartment.isPrimary).
+model StaffProfile {
+  id               String               @id @default(uuid())
+  characterId      String               @unique
+  character        Character            @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  employeeNumber      String               @unique
+  rankId           String
+  rank             Rank                 @relation(fields: [rankId], references: [id], onDelete: Restrict)
+  departmentId       String?
+  department         Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  status           StaffStatus        @default(ACTIVE)
+  callsign         String?
+  joinedAt         DateTime             @default(now()) @db.Date
+  decorations      StaffDecoration[]
+  licenses         StaffLicense[]
+  departmentMemberships StaffDepartment[]
+  complaintsAgainst Complaint[]         @relation("ComplaintAccusedStaff")
+  supervisedDepartments DepartmentSupervisor[]
+  interestLetters  InterestLetter[]
+  reportsLed       Report[]             @relation("ReportLead")
+  reportParticipations ReportParticipant[]
+  academyTrainingSupports AcademyTrainingSupportStaff[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([rankId])
+  @@index([departmentId])
+  @@index([status])
+}
+
+/// Many-to-many staff ↔ department with role (member / lead / supervisor).
+model StaffDepartment {
+  id               String                 @id @default(uuid())
+  staffProfileId String
+  staffProfile   StaffProfile         @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  departmentId       String
+  department         Department               @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  role             DepartmentMembershipRole @default(MEMBER)
+  isPrimary        Boolean                @default(false)
+  isActive         Boolean                @default(true)
+  assignedAt       DateTime               @default(now())
+  notes            String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([staffProfileId, departmentId])
+  @@index([departmentId])
+  @@index([staffProfileId, isActive])
+}
+
+model Decoration {
+  id          String              @id @default(uuid())
+  name        String              @unique
+  description String?
+  imageUrl    String?
+  isActive    Boolean             @default(true)
+  staffDecorations StaffDecoration[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model StaffDecoration {
+  id               String         @id @default(uuid())
+  staffProfileId String
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  decorationId     String
+  decoration       Decoration     @relation(fields: [decorationId], references: [id], onDelete: Cascade)
+  awardedAt        DateTime       @default(now()) @db.Date
+  notes            String?
+  createdAt        DateTime       @default(now())
+
+  @@unique([staffProfileId, decorationId])
+  @@index([decorationId])
+}
+
+/// Catalog of special staff certifications (EMS, trauma, etc.).
+model License {
+  id          String          @id @default(uuid())
+  code        String          @unique
+  name        String          @unique
+  description String?
+  imageUrl    String?
+  isActive    Boolean         @default(true)
+  staffLicenses StaffLicense[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model StaffLicense {
+  id                  String         @id @default(uuid())
+  staffProfileId    String
+  staffProfile      StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  licenseId           String
+  license             License        @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  assignedAt          DateTime       @default(now()) @db.Date
+  assignedByAccountId String
+  assignedByAccount   Account        @relation("LicenseAssignedBy", fields: [assignedByAccountId], references: [id], onDelete: Restrict)
+  notes               String?
+  createdAt           DateTime       @default(now())
+
+  @@unique([staffProfileId, licenseId])
+  @@index([licenseId])
+  @@index([assignedByAccountId])
+}
+
+model Complaint {
+  id                 String                   @id @default(uuid())
+  caseNumber         Int                      @unique @default(autoincrement())
+  title              String
+  description        String
+  incidentDate       DateTime?                @db.Date
+  location           String?
+  status             ComplaintStatus          @default(PENDING)
+  complainantId      String
+  complainant        Character                @relation("ComplaintComplainant", fields: [complainantId], references: [id], onDelete: Restrict)
+  accusedStaffId   String?
+  accusedStaff     StaffProfile?          @relation("ComplaintAccusedStaff", fields: [accusedStaffId], references: [id], onDelete: SetNull)
+  evidence           ComplaintEvidence[]
+  messages           ComplaintMessage[]
+  internalNotes      ComplaintInternalNote[]
+  assignments        ComplaintAssignment[]
+  events             ComplaintEvent[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([complainantId])
+  @@index([accusedStaffId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ComplaintEvidence {
+  id          String                @id @default(uuid())
+  complaintId String
+  complaint   Complaint             @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  type        ComplaintEvidenceType
+  label       String?
+  /// Image path (/uploads/...) or external video URL
+  value       String
+  createdAt   DateTime              @default(now())
+
+  @@index([complaintId])
+}
+
+model ComplaintMessage {
+  id          String    @id @default(uuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      Character @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body        String
+  createdAt   DateTime  @default(now())
+
+  @@index([complaintId, createdAt])
+  @@index([authorId])
+}
+
+model ComplaintInternalNote {
+  id          String    @id @default(uuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      Character @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body        String
+  createdAt   DateTime  @default(now())
+
+  @@index([complaintId, createdAt])
+  @@index([authorId])
+}
+
+model ComplaintAssignment {
+  id           String    @id @default(uuid())
+  complaintId  String
+  complaint    Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  characterId  String
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  isPrimary    Boolean   @default(false)
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+
+  @@unique([complaintId, characterId])
+  @@index([characterId])
+}
+
+model ComplaintEvent {
+  id          String             @id @default(uuid())
+  complaintId String
+  complaint   Complaint          @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       Character?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  type        ComplaintEventType
+  message     String
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+
+  @@index([complaintId, createdAt])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  accountId   String
+  account     Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  characterId String?
+  character   Character?       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  title       String
+  body        String
+  href        String?
+  metadata    Json?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([accountId, isRead, createdAt])
+  @@index([characterId])
+}
+
+model AuditLog {
+  id                String     @id @default(uuid())
+  actorAccountId    String?
+  actorAccount      Account?   @relation("AuditActorAccount", fields: [actorAccountId], references: [id], onDelete: SetNull)
+  actorCharacterId  String?
+  actorCharacter    Character? @relation("AuditActorCharacter", fields: [actorCharacterId], references: [id], onDelete: SetNull)
+  /// Event key, e.g. staff.promote, staff.rank_changed
+  action            String
+  /// Entity class: Staff, Department, Complaint, Character, …
+  targetType        String?
+  /// Entity primary id (staffProfileId when targetType = Staff)
+  targetId          String?
+  metadata          Json?
+  createdAt         DateTime   @default(now())
+
+  @@index([actorAccountId])
+  @@index([actorCharacterId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  permissions RolePermission[]
+  characters  CharacterRole[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime   @default(now())
+
+  @@id([roleId, permissionId])
+}
+
+model CharacterRole {
+  characterId String
+  roleId      String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedAt  DateTime  @default(now())
+
+  @@id([characterId, roleId])
+}
+
+model Report {
+  id                   String              @id @default(uuid())
+  reportNumber         Int                 @unique @default(autoincrement())
+  title                String
+  type                 ReportType          @default(CONSULTATION)
+  description          String
+  incidentDate         DateTime?           @db.Date
+  location             String?
+  status               ReportStatus        @default(PENDING)
+  priority             ReportPriority      @default(MEDIUM)
+  departmentId           String?
+  department             Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  leadStaffId        String?
+  leadStaff          StaffProfile?     @relation("ReportLead", fields: [leadStaffId], references: [id], onDelete: SetNull)
+  createdByCharacterId String
+  createdByCharacter   Character           @relation("ReportCreator", fields: [createdByCharacterId], references: [id], onDelete: Restrict)
+  participants         ReportParticipant[]
+  evidence             ReportEvidence[]
+  transfers            ReportTransfer[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([departmentId])
+  @@index([leadStaffId])
+  @@index([createdByCharacterId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model ReportParticipant {
+  id               String         @id @default(uuid())
+  reportId         String
+  report           Report         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  staffProfileId String
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@unique([reportId, staffProfileId])
+  @@index([staffProfileId])
+}
+
+model ReportEvidence {
+  id                     String             @id @default(uuid())
+  reportId               String
+  report                 Report             @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  type                   ReportEvidenceType
+  /// Stored path (/uploads/...) or external URL — never Base64 payloads.
+  value                  String
+  label                  String?
+  originalName           String?
+  uploadedByCharacterId  String?
+  uploadedByCharacter    Character?         @relation("ReportEvidenceUploader", fields: [uploadedByCharacterId], references: [id], onDelete: SetNull)
+  createdAt              DateTime           @default(now())
+
+  @@index([reportId])
+  @@index([uploadedByCharacterId])
+}
+
+/// Immutable history of department responsibility transfers (derivaciones).
+model ReportTransfer {
+  id                       String    @id @default(uuid())
+  reportId                 String
+  report                   Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  fromDepartmentId           String?
+  fromDepartment             Department? @relation("ReportTransferFrom", fields: [fromDepartmentId], references: [id], onDelete: SetNull)
+  toDepartmentId             String
+  toDepartment               Department  @relation("ReportTransferTo", fields: [toDepartmentId], references: [id], onDelete: Restrict)
+  transferredByCharacterId String
+  transferredByCharacter   Character @relation("ReportTransferActor", fields: [transferredByCharacterId], references: [id], onDelete: Restrict)
+  notes                    String?
+  createdAt                DateTime  @default(now())
+
+  @@index([reportId, createdAt])
+  @@index([fromDepartmentId])
+  @@index([toDepartmentId])
+}
+
+/// Scheduled academy training session.
+model AcademyTraining {
+  id                     String                  @id @default(uuid())
+  title                  String
+  description            String
+  instructorCharacterId  String
+  instructorCharacter    Character               @relation("AcademyTrainingInstructor", fields: [instructorCharacterId], references: [id], onDelete: Restrict)
+  startsAt               DateTime
+  location               String
+  capacity               Int?
+  status                 AcademyTrainingStatus   @default(SCHEDULED)
+  createdByCharacterId   String
+  createdByCharacter     Character               @relation("AcademyTrainingCreator", fields: [createdByCharacterId], references: [id], onDelete: Restrict)
+  attendances            AcademyTrainingAttendance[]
+  supportStaff        AcademyTrainingSupportStaff[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  @@index([startsAt])
+  @@index([status])
+  @@index([instructorCharacterId])
+}
+
+/// SAED staff assisting the primary instructor during a training.
+model AcademyTrainingSupportStaff {
+  id               String         @id @default(uuid())
+  trainingId       String
+  training         AcademyTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  staffProfileId String
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@unique([trainingId, staffProfileId])
+  @@index([staffProfileId])
+}
+
+model AcademyTrainingAttendance {
+  id          String                  @id @default(uuid())
+  trainingId  String
+  training    AcademyTraining         @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  characterId String
+  character   Character               @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  status      AcademyAttendanceStatus @default(PENDING)
+  respondedAt DateTime?
+  notes       String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@unique([trainingId, characterId])
+  @@index([characterId])
+  @@index([status])
+}
+
+model AcademyAnnouncement {
+  id                String                       @id @default(uuid())
+  title             String
+  content           String
+  authorCharacterId String
+  authorCharacter   Character                    @relation("AcademyAnnouncementAuthor", fields: [authorCharacterId], references: [id], onDelete: Restrict)
+  priority          AcademyAnnouncementPriority  @default(NORMAL)
+  publishedAt       DateTime                     @default(now())
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@index([publishedAt])
+  @@index([priority])
+}
+
+/// Institutional landing news (CMS). Only PUBLISHED items appear on the public site.
+model NewsArticle {
+  id                    String     @id @default(uuid())
+  title                 String
+  summary               String
+  content               String
+  coverImageUrl         String?
+  authorName            String
+  authorCharacterId     String?
+  authorCharacter       Character? @relation("NewsArticleAuthor", fields: [authorCharacterId], references: [id], onDelete: SetNull)
+  status                NewsStatus @default(DRAFT)
+  publishedAt           DateTime?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([authorCharacterId])
+}
+
+/// Institutional landing gallery (bento). Only ACTIVE items appear on the public site.
+model GalleryItem {
+  id          String            @id @default(uuid())
+  imageUrl    String
+  title       String?
+  description String?
+  sortOrder   Int               @default(0)
+  status      GalleryItemStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+/// Shared application envelope for academy intake and transfer requests.
+/// Typed form payloads live in `formData` (JSON) so each type can evolve independently.
+model AcademyApplication {
+  id                    String                   @id @default(uuid())
+  type                  AcademyApplicationType
+  status                AcademyApplicationStatus @default(PENDING)
+  characterId           String
+  character             Character                @relation("AcademyApplicationApplicant", fields: [characterId], references: [id], onDelete: Cascade)
+  formData              Json
+  internalNotes         String?
+  reviewNotes           String?
+  reviewedByCharacterId String?
+  reviewedByCharacter   Character?               @relation("AcademyApplicationReviewer", fields: [reviewedByCharacterId], references: [id], onDelete: SetNull)
+  reviewedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([type, status])
+  @@index([characterId, createdAt])
+  @@index([status, createdAt])
+}

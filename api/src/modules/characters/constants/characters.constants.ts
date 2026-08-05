@@ -1,0 +1,1 @@
+export const MAX_CHARACTERS_PER_ACCOUNT = 2;
