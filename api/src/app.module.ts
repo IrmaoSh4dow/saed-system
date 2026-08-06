@@ -28,6 +28,7 @@ import { IncentivesModule } from './modules/incentives/incentives.module';
 import { InstitutionalPaymentsModule } from './modules/institutional-payments/institutional-payments.module';
 import { RegulationsModule } from './modules/regulations/regulations.module';
 import { MedicalReportAccessModule } from './modules/medical-report-access/medical-report-access.module';
+import { EmploymentChangeModule } from './modules/employment-change/employment-change.module';
 import { AdminRequestsModule } from './modules/admin-requests/admin-requests.module';
 import { EstablishmentsModule } from './modules/establishments/establishments.module';
 import { AgreementsModule } from './modules/agreements/agreements.module';
@@ -61,6 +62,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     InstitutionalPaymentsModule,
     RegulationsModule,
     MedicalReportAccessModule,
+    EmploymentChangeModule,
     OccupationalHealthModule,
     StaffRatingsModule,
     PatientsModule,

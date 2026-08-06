@@ -3,7 +3,12 @@ import { renderStaffDecorationsGrid } from '../../components/staff/staff-decorat
 import { renderStaffDepartmentPanel } from '../../components/staff/staff-department-panel.js';
 import { renderStaffDepartmentsSection } from '../../components/staff/staff-departments-section.js';
 import { getApiErrorMessage } from '../../services/auth.service.js';
-import { getCharacterAdmin, listCharactersDirectory } from '../../services/characters.service.js';
+import {
+  getCharacterAdmin,
+  listCharactersDirectory,
+  listWorkplaces,
+} from '../../services/characters.service.js';
+import { applyCharacterEmployment } from '../../services/employment-change.service.js';
 import { createOfficer, updateOfficer } from '../../services/staff.service.js';
 import { listDepartments } from '../../services/departments.service.js';
 import { listRanks } from '../../services/ranks.service.js';
@@ -33,6 +38,8 @@ export function adminCharactersPage() {
   const canUpdateOfficer = can(PERMISSIONS.STAFF_UPDATE);
   const canManageDecorations = can(PERMISSIONS.DECORATIONS_MANAGE);
   const canAssignRoles = can(PERMISSIONS.ROLES_ASSIGN) || can('*');
+  const canManageEmployment =
+    can(PERMISSIONS.EMPLOYMENT_CHANGE_MANAGE) || can('*') || can(PERMISSIONS.ADMIN_ACCESS);
   const detailId = new URLSearchParams(window.location.search).get('id');
 
   if (detailId) {
@@ -41,6 +48,7 @@ export function adminCharactersPage() {
       canUpdateOfficer,
       canManageDecorations,
       canAssignRoles,
+      canManageEmployment,
     });
   }
 
@@ -174,7 +182,7 @@ export function adminCharactersPage() {
 
 function adminCharacterDetailPage(
   characterId,
-  { canPromote, canUpdateOfficer, canManageDecorations, canAssignRoles },
+  { canPromote, canUpdateOfficer, canManageDecorations, canAssignRoles, canManageEmployment },
 ) {
   const content = `
     <div class="space-y-6">
@@ -223,11 +231,16 @@ function adminCharacterDetailPage(
           decorations = decorationsData.filter((item) => item.isActive);
           rolesCatalog = Array.isArray(rolesData) ? rolesData : [];
           assignedRoleSlugs = (characterRolesData?.roles ?? []).map((item) => item.slug);
+          const workplaces = canManageEmployment
+            ? await listWorkplaces().catch(() => ({ civilian: [] }))
+            : { civilian: [] };
           renderCharacterDetail(root, character, {
             canPromote,
             canUpdateOfficer,
             canManageDecorations,
             canAssignRoles,
+            canManageEmployment,
+            workplaces: workplaces.civilian ?? [],
             canViewOfficerComplaints:
               can(PERMISSIONS.COMPLAINTS_MANAGE) || can(PERMISSIONS.ADMIN_ACCESS),
             ranks,
@@ -241,6 +254,7 @@ function adminCharacterDetailPage(
             canUpdateOfficer,
             canManageDecorations,
             canAssignRoles,
+            canManageEmployment,
             canViewOfficerComplaints:
               can(PERMISSIONS.COMPLAINTS_MANAGE) || can(PERMISSIONS.ADMIN_ACCESS),
             load,
@@ -323,6 +337,8 @@ function renderCharacterDetail(
     canUpdateOfficer,
     canManageDecorations,
     canAssignRoles = false,
+    canManageEmployment = false,
+    workplaces = [],
     canViewOfficerComplaints,
     ranks,
     departments,
@@ -343,6 +359,9 @@ function renderCharacterDetail(
     `${character.firstName?.[0] ?? ''}${character.lastName?.[0] ?? ''}`.toUpperCase();
   const showPromote = canPromote && !officer && character.status === 'CIVIL';
   const forcePromote = new URLSearchParams(window.location.search).get('promote') === '1';
+  const isSaedStaff =
+    Boolean(officer) || ['INTERN', 'MEDICAL_STAFF', 'CADET', 'OFFICER'].includes(character.status);
+  const showEmploymentEditor = canManageEmployment && !isSaedStaff;
 
   host.innerHTML = `
     <section class="panel overflow-hidden p-6 md:p-8">
@@ -377,6 +396,44 @@ function renderCharacterDetail(
         })}
       </div>
     </section>
+
+    ${
+      showEmploymentEditor
+        ? `
+          <section class="panel p-6">
+            <h3 class="text-sm font-semibold text-white">Cambio manual de empleo</h3>
+            <p class="mt-1 text-xs text-ink-400">
+              Corrección administrativa. No crea solicitud. Al salir del LSPD se limpia la placa del paciente vinculado.
+            </p>
+            <form id="admin-employment-form" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <div>
+                <label class="form-label" for="admin-employment-establishment">Organización / establecimiento</label>
+                <select id="admin-employment-establishment" class="form-input" required>
+                  ${workplaces
+                    .map(
+                      (item) =>
+                        `<option value="${escapeAttr(item.id)}" ${
+                          occupation?.establishmentId === item.id ||
+                          occupation?.organization === item.name
+                            ? 'selected'
+                            : ''
+                        }>${escapeHtml(item.name)}</option>`,
+                    )
+                    .join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="admin-employment-reason">Motivo administrativo</label>
+                <input id="admin-employment-reason" class="form-input" maxlength="1000" placeholder="Corrección, ingreso, etc." />
+              </div>
+              <div class="flex items-end">
+                <button type="submit" class="btn-primary w-full">Aplicar cambio</button>
+              </div>
+            </form>
+          </section>
+        `
+        : ''
+    }
 
     ${officer ? `<div class="mt-6">${renderStaffDepartmentsSection(officer, { showBadge: false })}</div>` : ''}
 
@@ -594,6 +651,7 @@ function bindDetailActions(
     canUpdateOfficer,
     canManageDecorations,
     canAssignRoles = false,
+    canManageEmployment = false,
     canViewOfficerComplaints,
     load,
   },
@@ -602,10 +660,34 @@ function bindDetailActions(
   const departmentForm = root.querySelector('#department-form');
   const awardForm = root.querySelector('#award-decoration-form');
   const rolesForm = root.querySelector('#character-roles-form');
+  const employmentForm = root.querySelector('#admin-employment-form');
 
   if (canViewOfficerComplaints && character.staffProfile) {
     void loadOfficerComplaints(root, character.staffProfile.id);
   }
+
+  employmentForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!canManageEmployment) return;
+    try {
+      await applyCharacterEmployment(character.id, {
+        establishmentId: root.querySelector('#admin-employment-establishment').value,
+        reason: root.querySelector('#admin-employment-reason').value.trim() || undefined,
+      });
+      setAuthAlert(root, {
+        id: 'admin-character-detail-alert',
+        type: 'success',
+        message: 'Organización actualizada. El historial financiero/clínico no se modifica.',
+      });
+      await load();
+    } catch (error) {
+      setAuthAlert(root, {
+        id: 'admin-character-detail-alert',
+        type: 'error',
+        message: getApiErrorMessage(error),
+      });
+    }
+  });
 
   rolesForm?.addEventListener('submit', async (event) => {
     event.preventDefault();

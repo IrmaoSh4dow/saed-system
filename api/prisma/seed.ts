@@ -205,6 +205,10 @@ const PERMISSIONS = [
   { key: 'medical-report-access.read', description: 'View temporary medical report access grants' },
   { key: 'medical-report-access.grant', description: 'Grant temporary medical report access to external supervisors' },
   { key: 'medical-report-access.revoke', description: 'Revoke temporary medical report access grants' },
+  { key: 'employment-change.create', description: 'Request a civilian employment / establishment change' },
+  { key: 'employment-change.read', description: 'View employment change requests' },
+  { key: 'employment-change.review', description: 'Approve or reject employment change requests' },
+  { key: 'employment-change.manage', description: 'Manually change character employment' },
   { key: 'staff-ratings.create', description: 'Submit medical staff ratings after completed appointments' },
   { key: 'staff-ratings.read', description: 'View medical staff ratings (High Command only)' },
   { key: 'staff-ratings.dashboard', description: 'View hospital-wide ratings analytics' },
@@ -243,6 +247,8 @@ const CIVILIAN_CORE = [
   'staff-ratings.create',
   'appointments.read',
   'appointments.create',
+  'employment-change.create',
+  'employment-change.read',
 ] as const;
 
 const CIVILIAN_BASE = [...CIVILIAN_CORE, 'academy.apply'] as const;
@@ -347,6 +353,9 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'medical-report-access.read',
   'medical-report-access.grant',
   'medical-report-access.revoke',
+  'employment-change.read',
+  'employment-change.review',
+  'employment-change.manage',
   'staff-ratings.read',
   'staff-ratings.dashboard',
 ] as const;
@@ -378,6 +387,8 @@ const LSPD_MEDICAL_SUPERVISOR_PERMISSIONS = [
   'medical-record-access.read',
   'medical-record-access.request',
   'medical-report-access.read',
+  'employment-change.create',
+  'employment-change.read',
 ] as const;
 
 const ROLES = [
@@ -758,6 +769,7 @@ async function pruneOperationalData(): Promise<void> {
       "MedicalRecordAccessRequest",
       "MedicalReportAccessViewLog",
       "MedicalReportAccessGrant",
+      "EmploymentChangeRequest",
       "PsychotechnicalEvaluation",
       "MedicalLeave",
       "MedicalRecord",

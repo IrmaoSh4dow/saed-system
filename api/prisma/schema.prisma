@@ -153,6 +153,8 @@ enum NotificationType {
   MEDICAL_REPORT_ACCESS_GRANTED
   MEDICAL_REPORT_ACCESS_REVOKED
   MEDICAL_REPORT_ACCESS_EXPIRING
+  EMPLOYMENT_CHANGE_CREATED
+  EMPLOYMENT_CHANGE_STATUS
   STAFF_RATING_CREATED
   DEPARTMENT_OPENING
   DEPARTMENT_INTEREST_LETTER
@@ -435,6 +437,9 @@ model Character {
   medicalReportAccessGrantsGranted    MedicalReportAccessGrant[]   @relation("MedicalReportAccessGrantedBy")
   medicalReportAccessGrantsRevoked    MedicalReportAccessGrant[]   @relation("MedicalReportAccessRevokedBy")
   medicalReportAccessViews            MedicalReportAccessViewLog[] @relation("MedicalReportAccessViewer")
+  employmentChangeRequests            EmploymentChangeRequest[]    @relation("EmploymentChangeRequester")
+  employmentChangeRequestsApproved    EmploymentChangeRequest[]    @relation("EmploymentChangeApprovedBy")
+  employmentChangeRequestsRejected    EmploymentChangeRequest[]    @relation("EmploymentChangeRejectedBy")
   staffRatingsGiven                   StaffRating[]                @relation("StaffRatingReviewer")
   applicationConfigsOpened            ApplicationConfiguration[]   @relation("ApplicationConfigOpenedBy")
   applicationConfigsClosed            ApplicationConfiguration[]   @relation("ApplicationConfigClosedBy")
@@ -501,6 +506,8 @@ model Establishment {
   agreements            Agreement[]
   patients              Patient[]
   institutionalPayments InstitutionalPayment[]
+  employmentChangesCurrent   EmploymentChangeRequest[] @relation("EmploymentChangeCurrentEstablishment")
+  employmentChangesRequested EmploymentChangeRequest[] @relation("EmploymentChangeRequestedEstablishment")
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
@@ -1880,4 +1887,45 @@ model MedicalReportAccessViewLog {
 
   @@index([grantId, viewedAt])
   @@index([viewerCharacterId, viewedAt])
+}
+
+/// Formal request to change a character's civilian employment / establishment.
+enum EmploymentChangeRequestStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model EmploymentChangeRequest {
+  id                         String                         @id @default(uuid())
+  requestNumber              Int                            @unique @default(autoincrement())
+  characterId                String
+  character                  Character                      @relation("EmploymentChangeRequester", fields: [characterId], references: [id], onDelete: Cascade)
+  currentEstablishmentId     String?
+  currentEstablishment       Establishment?                 @relation("EmploymentChangeCurrentEstablishment", fields: [currentEstablishmentId], references: [id], onDelete: SetNull)
+  /// Snapshot of current workplace name at request time.
+  currentOrganizationName    String?
+  requestedEstablishmentId   String
+  requestedEstablishment     Establishment                  @relation("EmploymentChangeRequestedEstablishment", fields: [requestedEstablishmentId], references: [id], onDelete: Restrict)
+  /// Snapshot of requested workplace name at request time.
+  requestedOrganizationName  String
+  reason                     String
+  status                     EmploymentChangeRequestStatus  @default(PENDING)
+  internalNotes              String?
+  approvedByCharacterId      String?
+  approvedByCharacter        Character?                     @relation("EmploymentChangeApprovedBy", fields: [approvedByCharacterId], references: [id], onDelete: SetNull)
+  approvedAt                 DateTime?
+  rejectedByCharacterId      String?
+  rejectedByCharacter        Character?                     @relation("EmploymentChangeRejectedBy", fields: [rejectedByCharacterId], references: [id], onDelete: SetNull)
+  rejectedAt                 DateTime?
+  rejectionReason            String?
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+
+  @@index([characterId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedEstablishmentId])
+  @@index([currentEstablishmentId])
 }

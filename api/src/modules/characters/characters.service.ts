@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CharacterStatus, Prisma } from '@prisma/client';
+import { CharacterStatus, EstablishmentStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { isSaedOrganization, SAED_ORGANIZATION } from '../../common/constants/workplaces';
 import { excludeSystemAdministratorCharacter } from '../../common/constants/staff-filters';
@@ -13,6 +13,7 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { RolesService } from '../roles/roles.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
 import { EstablishmentsService } from '../establishments/establishments.service';
+import { isLspdEstablishment } from '../patients/utils/patient-establishment.util';
 import { AvatarStorageService } from './avatar-storage.service';
 import { MAX_CHARACTERS_PER_ACCOUNT } from './constants/characters.constants';
 import { CreateCharacterDto } from './dto/create-character.dto';
@@ -328,40 +329,15 @@ export class CharactersService {
     }
 
     const existing = await this.findByIdForAccount(activeCharacterId, accountId);
-    const belongsToSaed = await this.permissionsService.belongsToSaed(existing.id);
-    const previousOrganization =
-      existing.occupations?.find((item) => item.isPrimary)?.organization ??
-      existing.occupations?.[0]?.organization ??
-      null;
-    let nextOrganization: string | null | undefined = undefined;
 
-    if (dto.organization !== undefined && belongsToSaed) {
-      throw new ForbiddenException(
-        'SAED members cannot change their establishment. It is managed by the department.',
+    if (dto.organization !== undefined) {
+      throw new BadRequestException(
+        'Employment changes require an approved request. Use Solicitar cambio de empleo.',
       );
     }
 
-    if (!belongsToSaed && dto.organization !== undefined) {
-      const raw = dto.organization?.trim() || '';
-      if (!raw) {
-        nextOrganization = null;
-      } else if (isSaedOrganization(raw)) {
-        throw new BadRequestException(
-          'SAED cannot be selected as a civilian workplace. It is assigned only through department promotion.',
-        );
-      } else {
-        const workplace = await this.establishmentsService.findSelectableByOrganization(raw);
-        if (!workplace) {
-          throw new BadRequestException(
-            'Invalid organization. Select an establishment from the catalog.',
-          );
-        }
-        nextOrganization = workplace.name;
-      }
-    }
-
     const character = await this.prismaService.$transaction(async (tx) => {
-      const updated = await tx.character.update({
+      await tx.character.update({
         where: { id: existing.id },
         data: {
           firstName: dto.firstName?.trim(),
@@ -385,10 +361,6 @@ export class CharactersService {
         },
         include: characterInclude,
       });
-
-      if (nextOrganization !== undefined) {
-        await this.syncCivilianOccupation(tx, existing.id, nextOrganization);
-      }
 
       return tx.character.findUniqueOrThrow({
         where: { id: existing.id },
@@ -439,26 +411,103 @@ export class CharactersService {
       });
     }
 
-    const mapped = toCharacterResponseDto(character);
-    const newOrg = mapped.primaryOccupation?.organization ?? null;
-    if (
-      nextOrganization !== undefined &&
-      (previousOrganization ?? null) !== (newOrg ?? null)
-    ) {
-      await this.auditService.create({
-        actorAccountId: accountId,
-        actorCharacterId: character.id,
-        action: 'characters.workplace_changed',
-        targetType: AUDIT_TARGET.CHARACTER,
-        targetId: character.id,
-        metadata: {
-          from: previousOrganization,
-          to: newOrg,
+    return toCharacterResponseDto(character);
+  }
+
+  /**
+   * Applies a civilian workplace change (occupation + linked patient sync).
+   * Historical invoices/reports/payments are never rewritten.
+   */
+  async applyCivilianWorkplaceChange(
+    characterId: string,
+    establishmentId: string,
+    actor: { accountId: string; characterId: string },
+    options?: { source?: string; reason?: string | null },
+  ) {
+    const character = await this.prismaService.character.findUnique({
+      where: { id: characterId },
+      include: {
+        occupations: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+          include: { establishment: { select: { id: true, name: true, slug: true } } },
         },
-      });
+        linkedPatient: {
+          select: { id: true, establishmentId: true, badgeNumber: true },
+        },
+      },
+    });
+    if (!character) {
+      throw new NotFoundException('Character was not found');
     }
 
-    return mapped;
+    const belongsToSaed = await this.permissionsService.belongsToSaed(characterId);
+    if (belongsToSaed) {
+      throw new ForbiddenException(
+        'SAED members cannot change civilian employment. Organization is managed by the department.',
+      );
+    }
+
+    const workplace = await this.prismaService.establishment.findFirst({
+      where: {
+        id: establishmentId,
+        status: EstablishmentStatus.ACTIVE,
+        isSelectable: true,
+      },
+    });
+    if (!workplace) {
+      throw new BadRequestException(
+        'Invalid organization. Select an establishment from the catalog.',
+      );
+    }
+    if (isSaedOrganization(workplace.name)) {
+      throw new BadRequestException(
+        'SAED cannot be selected as a civilian workplace. It is assigned only through department promotion.',
+      );
+    }
+
+    const previousOccupation = character.occupations?.[0] ?? null;
+    const previousOrganization = previousOccupation?.organization ?? null;
+    const previousEstablishmentId = previousOccupation?.establishmentId ?? null;
+    const joiningLspd = isLspdEstablishment(workplace);
+
+    await this.prismaService.$transaction(async (tx) => {
+      await this.syncCivilianOccupation(tx, characterId, workplace.name);
+
+      if (character.linkedPatient) {
+        await tx.patient.update({
+          where: { id: character.linkedPatient.id },
+          data: {
+            establishmentId: workplace.id,
+            badgeNumber: joiningLspd ? character.linkedPatient.badgeNumber : null,
+          },
+        });
+      }
+    });
+
+    await this.auditService.create({
+      actorAccountId: actor.accountId,
+      actorCharacterId: actor.characterId,
+      action: 'characters.workplace_changed',
+      targetType: AUDIT_TARGET.CHARACTER,
+      targetId: characterId,
+      metadata: {
+        source: options?.source ?? 'employment-change',
+        reason: options?.reason ?? null,
+        from: previousOrganization,
+        to: workplace.name,
+        fromEstablishmentId: previousEstablishmentId,
+        toEstablishmentId: workplace.id,
+        linkedPatientSynced: Boolean(character.linkedPatient),
+        badgeCleared: Boolean(character.linkedPatient?.badgeNumber) && !joiningLspd,
+      },
+    });
+
+    return this.prismaService.character.findUniqueOrThrow({
+      where: { id: characterId },
+      include: characterInclude,
+    }).then(toCharacterResponseDto);
   }
 
   async uploadAvatar(

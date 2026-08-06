@@ -283,6 +283,16 @@ export const ADMIN_NAVIGATION = [
       PERMISSIONS.ADMIN_ACCESS,
     ],
   },
+  {
+    name: 'Solicitudes de Cambio de Empleo',
+    path: '/admin/employment-change',
+    permission: PERMISSIONS.EMPLOYMENT_CHANGE_REVIEW,
+    anyPermissions: [
+      PERMISSIONS.EMPLOYMENT_CHANGE_REVIEW,
+      PERMISSIONS.EMPLOYMENT_CHANGE_MANAGE,
+      PERMISSIONS.ADMIN_ACCESS,
+    ],
+  },
 ];
 
 export function getVisibleNavigation(grantedPermissions, activeCharacter = null) {

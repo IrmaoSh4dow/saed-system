@@ -44,6 +44,7 @@ import { staffRatingsPage } from '../pages/staff-ratings.page.js';
 import { adminEstablishmentsPage } from '../pages/admin/admin-establishments.page.js';
 import { adminInstitutionalPaymentsPage } from '../pages/admin/admin-institutional-payments.page.js';
 import { adminMedicalReportAccessPage } from '../pages/admin/admin-medical-report-access.page.js';
+import { adminEmploymentChangePage } from '../pages/admin/admin-employment-change.page.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
 export const privateRoutes = [
@@ -122,6 +123,11 @@ export const privateRoutes = [
     path: '/admin/medical-report-access',
     handler: adminMedicalReportAccessPage,
     permission: PERMISSIONS.MEDICAL_REPORT_ACCESS_GRANT,
+  },
+  {
+    path: '/admin/employment-change',
+    handler: adminEmploymentChangePage,
+    permission: PERMISSIONS.EMPLOYMENT_CHANGE_REVIEW,
   },
   {
     path: '/shifts',

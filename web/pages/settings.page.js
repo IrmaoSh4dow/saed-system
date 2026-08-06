@@ -1,6 +1,13 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
 import { initPasswordToggles, renderPasswordField } from '../components/auth/password-field.js';
 import { renderSubmitButton, setButtonLoading } from '../components/auth/submit-button.js';
+import {
+  bindAppModal,
+  closeAppModal,
+  openAppModal,
+  renderAppModal,
+  setAppModalContent,
+} from '../components/ui/modal.js';
 import { renderPageHeader } from '../components/ui/page-header.js';
 import { renderSummaryStrip } from '../components/ui/summary-strip.js';
 import { SAED_ORGANIZATION } from '../config/workplaces.js';
@@ -10,7 +17,7 @@ import {
   setIdentityCharacters,
   setIdentityUser,
 } from '../services/auth-state.store.js';
-import { getAuthState } from '../services/auth-context.js';
+import { can, getAuthState } from '../services/auth-context.js';
 import { changeMyPassword, updateMyUsername } from '../services/accounts.service.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import {
@@ -19,8 +26,15 @@ import {
   updateMyCharacter,
   uploadCharacterAvatar,
 } from '../services/characters.service.js';
+import {
+  cancelEmploymentChangeRequest,
+  createEmploymentChangeRequest,
+  EMPLOYMENT_CHANGE_STATUS_LABELS,
+  listMyEmploymentChangeRequests,
+} from '../services/employment-change.service.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
 import { isSaedMember as checkIsSaedMember } from '../utils/character.js';
+import { formatDateTimeLabel } from '../utils/date.js';
 import { validateImageUploadFile } from '../utils/image-upload.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
@@ -252,20 +266,28 @@ export function settingsPage() {
             <textarea id="settings-biography" class="form-input min-h-[96px]" maxlength="2000" placeholder="Breve descripción del personaje (opcional)">${escapeHtml(activeCharacter.biography ?? '')}</textarea>
           </div>
 
-          <div>
-            <label class="form-label" for="settings-organization">Establecimiento / empleo</label>
-            ${
-              isSaedMember
-                ? `
-              <input id="settings-organization" class="form-input" value="${escapeAttr(SAED_ORGANIZATION)}" disabled />
-              <p class="form-hint mt-2">Los miembros del SAED no pueden cambiar su establecimiento.</p>
-            `
-                : `
-              <select id="settings-organization" class="form-input" data-current-org="${escapeAttr(currentOrg ?? '')}">
-                <option value="">Cargando establecimientos…</option>
-              </select>
-            `
-            }
+          <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="text-[11px] uppercase tracking-wide text-ink-500">Establecimiento / empleo actual</p>
+                <p class="mt-1 text-base font-semibold text-white">${escapeHtml(currentOrg || 'Sin empleo')}</p>
+                <p class="mt-1 text-xs text-ink-500">
+                  ${
+                    isSaedMember
+                      ? 'Los miembros del SAED no pueden solicitar cambios de empleo civil.'
+                      : 'Los cambios de empleo requieren aprobación del Alto Mando del SAED.'
+                  }
+                </p>
+              </div>
+              ${
+                !isSaedMember && can(PERMISSIONS.EMPLOYMENT_CHANGE_CREATE)
+                  ? `<button type="button" id="request-employment-change" class="btn-primary">Solicitar cambio de empleo</button>`
+                  : ''
+              }
+            </div>
+            <div id="employment-change-history" class="mt-4 space-y-2">
+              <p class="text-xs text-ink-500">Cargando solicitudes…</p>
+            </div>
           </div>
 
           <div class="pt-2">
@@ -277,6 +299,12 @@ export function settingsPage() {
           </div>
         </form>
       </section>
+      ${renderAppModal({
+        id: 'employment-change-modal',
+        title: 'Solicitar cambio de empleo',
+        size: 'md',
+        bodyHtml: '<p class="text-sm text-ink-400">Cargando…</p>',
+      })}
     </div>
   `;
 
@@ -284,36 +312,155 @@ export function settingsPage() {
     html: renderDashboardLayout(content, { title: 'Configuración', currentPath: '/settings' }),
     afterMount(root) {
       document.title = 'Configuración · SAED';
-      const cleanup = initDashboardLayout(root);
+      const cleanupLayout = initDashboardLayout(root);
+      const cleanupModal = bindAppModal(root, { modalId: 'employment-change-modal' });
 
-      const organizationSelect = root.querySelector('#settings-organization');
-      if (organizationSelect && !organizationSelect.disabled) {
-        const currentOrg = organizationSelect.getAttribute('data-current-org') || '';
-        void listWorkplaces()
-          .then((catalog) => {
-            const workplaces = catalog.civilian ?? [];
-            organizationSelect.innerHTML = workplaces
-              .map(
-                (item) =>
-                  `<option value="${escapeAttr(item.name)}" ${currentOrg === item.name ? 'selected' : ''}>${escapeHtml(item.name)}</option>`,
-              )
-              .join('');
-            if (currentOrg && !workplaces.some((item) => item.name === currentOrg)) {
-              organizationSelect.insertAdjacentHTML(
-                'afterbegin',
-                `<option value="${escapeAttr(currentOrg)}" selected>${escapeHtml(currentOrg)}</option>`,
-              );
-            }
-          })
-          .catch((error) => {
-            organizationSelect.innerHTML = `<option value="">Error al cargar</option>`;
-            setAuthAlert(root, {
-              id: 'settings-alert',
-              type: 'error',
-              message: getApiErrorMessage(error, 'No se pudo cargar el catálogo de establecimientos.'),
+      const paintEmploymentHistory = async () => {
+        const host = root.querySelector('#employment-change-history');
+        if (!host || isSaedMember || !can(PERMISSIONS.EMPLOYMENT_CHANGE_READ)) {
+          if (host) host.innerHTML = '';
+          return;
+        }
+        try {
+          const requests = await listMyEmploymentChangeRequests();
+          if (!requests.length) {
+            host.innerHTML = `<p class="text-xs text-ink-500">No hay solicitudes de cambio de empleo.</p>`;
+            return;
+          }
+          host.innerHTML = `
+            <p class="text-[11px] uppercase tracking-wide text-ink-500">Historial de solicitudes</p>
+            <div class="mt-2 space-y-2">
+              ${requests
+                .map((item) => {
+                  const open = item.status === 'PENDING' || item.status === 'UNDER_REVIEW';
+                  return `
+                    <div class="rounded-xl border border-white/10 px-3 py-2.5">
+                      <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p class="text-sm text-white">
+                            ${escapeHtml(item.currentOrganizationName || 'Sin empleo')}
+                            → ${escapeHtml(item.requestedOrganizationName)}
+                          </p>
+                          <p class="mt-1 text-[11px] text-ink-500">
+                            ${escapeHtml(EMPLOYMENT_CHANGE_STATUS_LABELS[item.status] || item.status)}
+                            · ${escapeHtml(formatDateTimeLabel(item.createdAt))}
+                          </p>
+                          ${
+                            item.rejectionReason
+                              ? `<p class="mt-1 text-xs text-rose-300">Motivo del rechazo: ${escapeHtml(item.rejectionReason)}</p>`
+                              : ''
+                          }
+                        </div>
+                        ${
+                          open
+                            ? `<button type="button" class="text-xs text-rose-300 hover:text-rose-200" data-cancel-employment="${item.id}">Cancelar</button>`
+                            : ''
+                        }
+                      </div>
+                    </div>
+                  `;
+                })
+                .join('')}
+            </div>
+          `;
+          host.querySelectorAll('[data-cancel-employment]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              try {
+                await cancelEmploymentChangeRequest(button.getAttribute('data-cancel-employment'));
+                setAuthAlert(root, {
+                  id: 'settings-alert',
+                  type: 'success',
+                  message: 'Solicitud cancelada.',
+                });
+                void paintEmploymentHistory();
+              } catch (error) {
+                setAuthAlert(root, {
+                  id: 'settings-alert',
+                  type: 'error',
+                  message: getApiErrorMessage(error),
+                });
+              }
             });
           });
-      }
+        } catch (error) {
+          host.innerHTML = `<p class="text-xs text-rose-300">${escapeHtml(getApiErrorMessage(error))}</p>`;
+        }
+      };
+
+      root.querySelector('#request-employment-change')?.addEventListener('click', async () => {
+        setAppModalContent(root, {
+          modalId: 'employment-change-modal',
+          title: 'Solicitar cambio de empleo',
+          bodyHtml: `<p class="text-sm text-ink-400">Cargando establecimientos…</p>`,
+          footerHtml: `<button type="button" class="btn-secondary" data-modal-close>Cancelar</button>`,
+        });
+        openAppModal(root, 'employment-change-modal');
+        try {
+          const catalog = await listWorkplaces();
+          const workplaces = catalog.civilian ?? [];
+          setAppModalContent(root, {
+            modalId: 'employment-change-modal',
+            bodyHtml: `
+              <form id="employment-change-form" class="space-y-4">
+                <p class="text-sm text-ink-300">
+                  Organización actual:
+                  <span class="font-medium text-white">${escapeHtml(currentOrg || 'Sin empleo')}</span>
+                </p>
+                <div>
+                  <label class="form-label" for="employment-target">Nueva organización</label>
+                  <select id="employment-target" class="form-input" required>
+                    <option value="">Seleccionar…</option>
+                    ${workplaces
+                      .map(
+                        (item) =>
+                          `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
+                      )
+                      .join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label" for="employment-reason">Motivo del cambio</label>
+                  <textarea id="employment-reason" class="form-input min-h-28" required minlength="8" maxlength="1000"
+                    placeholder="Explica el motivo institucional del cambio…"></textarea>
+                </div>
+              </form>
+            `,
+            footerHtml: `
+              <button type="button" class="btn-secondary" data-modal-close>Cancelar</button>
+              <button type="submit" form="employment-change-form" class="btn-primary">Enviar solicitud</button>
+            `,
+          });
+          root.querySelector('#employment-change-form')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+              await createEmploymentChangeRequest({
+                requestedEstablishmentId: root.querySelector('#employment-target').value,
+                reason: root.querySelector('#employment-reason').value.trim(),
+              });
+              closeAppModal(root, 'employment-change-modal');
+              setAuthAlert(root, {
+                id: 'settings-alert',
+                type: 'success',
+                message: 'Solicitud enviada. El Alto Mando la revisará.',
+              });
+              void paintEmploymentHistory();
+            } catch (error) {
+              setAuthAlert(root, {
+                id: 'settings-alert',
+                type: 'error',
+                message: getApiErrorMessage(error),
+              });
+            }
+          });
+        } catch (error) {
+          setAppModalContent(root, {
+            modalId: 'employment-change-modal',
+            bodyHtml: `<p class="text-sm text-rose-300">${escapeHtml(getApiErrorMessage(error))}</p>`,
+          });
+        }
+      });
+
+      void paintEmploymentHistory();
       initPasswordToggles(root);
       const form = root.querySelector('#my-character-form');
       const usernameForm = root.querySelector('#settings-username-form');
@@ -398,7 +545,6 @@ export function settingsPage() {
         const nationality = root.querySelector('#settings-nationality')?.value.trim() ?? '';
         const phone = root.querySelector('#settings-phone')?.value.trim() ?? '';
         const biography = root.querySelector('#settings-biography')?.value.trim() ?? '';
-        const organizationSelect = root.querySelector('#settings-organization');
 
         if (firstName.length < 2 || lastName.length < 2) {
           setAuthAlert(root, {
@@ -421,10 +567,6 @@ export function settingsPage() {
             phone: phone || null,
             biography: biography || null,
           };
-
-          if (!checkIsSaedMember(current) && organizationSelect && !organizationSelect.disabled) {
-            payload.organization = organizationSelect.value;
-          }
 
           let updated = await updateMyCharacter(payload);
 
@@ -582,7 +724,8 @@ export function settingsPage() {
         form?.removeEventListener('submit', onSubmit);
         usernameForm?.removeEventListener('submit', onUsernameSubmit);
         passwordForm?.removeEventListener('submit', onPasswordSubmit);
-        cleanup?.();
+        cleanupModal?.();
+        cleanupLayout?.();
       };
     },
   };

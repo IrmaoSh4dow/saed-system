@@ -23,6 +23,7 @@ export const AUDIT_TARGET = {
   MEDICAL_LEAVE: 'MedicalLeave',
   MEDICAL_RECORD_ACCESS_REQUEST: 'MedicalRecordAccessRequest',
   MEDICAL_REPORT_ACCESS_GRANT: 'MedicalReportAccessGrant',
+  EMPLOYMENT_CHANGE_REQUEST: 'EmploymentChangeRequest',
   STAFF_RATING: 'StaffRating',
   PATIENT: 'Patient',
   PATIENT_INVOICE: 'PatientInvoice',
