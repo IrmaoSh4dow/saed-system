@@ -220,8 +220,7 @@ export function agreementsPage() {
                 `,
               );
             } catch (error) {
-              setAuthAlert({
-                root,
+              setAuthAlert(root, {
                 id: 'agreements-alert',
                 type: 'error',
                 message: getApiErrorMessage(error),
@@ -305,17 +304,15 @@ export function agreementsPage() {
                 } else {
                   await createAgreement(payload);
                 }
-                setAuthAlert({
-                  root,
+                setAuthAlert(root, {
                   id: 'agreements-alert',
                   type: 'success',
                   message: current ? 'Convenio actualizado.' : 'Convenio creado.',
                 });
                 closeDrawer();
-                await Promise.all([loadSummary(), loadDirectory()]);
+                await refreshAgreementsView();
               } catch (error) {
-                setAuthAlert({
-                  root,
+                setAuthAlert(root, {
                   id: 'agreements-alert',
                   type: 'error',
                   message: getApiErrorMessage(error),
@@ -326,17 +323,15 @@ export function agreementsPage() {
             drawerBody?.querySelector('#agreement-deactivate')?.addEventListener('click', async () => {
               try {
                 await deactivateAgreement(current.id);
-                setAuthAlert({
-                  root,
+                setAuthAlert(root, {
                   id: 'agreements-alert',
                   type: 'success',
                   message: 'Convenio desactivado.',
                 });
                 closeDrawer();
-                await Promise.all([loadSummary(), loadDirectory()]);
+                await refreshAgreementsView();
               } catch (error) {
-                setAuthAlert({
-                  root,
+                setAuthAlert(root, {
                   id: 'agreements-alert',
                   type: 'error',
                   message: getApiErrorMessage(error),
@@ -347,17 +342,15 @@ export function agreementsPage() {
             drawerBody?.querySelector('#agreement-activate')?.addEventListener('click', async () => {
               try {
                 await activateAgreement(current.id);
-                setAuthAlert({
-                  root,
+                setAuthAlert(root, {
                   id: 'agreements-alert',
                   type: 'success',
                   message: 'Convenio activado.',
                 });
                 closeDrawer();
-                await Promise.all([loadSummary(), loadDirectory()]);
+                await refreshAgreementsView();
               } catch (error) {
-                setAuthAlert({
-                  root,
+                setAuthAlert(root, {
                   id: 'agreements-alert',
                   type: 'error',
                   message: getApiErrorMessage(error),
@@ -366,6 +359,16 @@ export function agreementsPage() {
             });
           });
         });
+      };
+
+      const refreshAgreementsView = async () => {
+        await Promise.all([
+          loadSummary(),
+          loadDirectory(
+            root.querySelector('#agreements-query')?.value ?? '',
+            Boolean(root.querySelector('#agreements-only-affiliated')?.checked),
+          ),
+        ]);
       };
 
       const loadDirectory = async (q = '', onlyAffiliated = false) => {

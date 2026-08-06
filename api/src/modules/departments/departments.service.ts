@@ -238,6 +238,19 @@ export class DepartmentsService {
   ) {
     await this.requireDepartment(id);
 
+    if (dto.name?.trim()) {
+      const conflict = await this.prismaService.department.findFirst({
+        where: {
+          id: { not: id },
+          name: { equals: dto.name.trim(), mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      if (conflict) {
+        throw new ConflictException('Another department already uses that name');
+      }
+    }
+
     const imageUrl =
       dto.imageUrl === undefined
         ? undefined
@@ -264,6 +277,36 @@ export class DepartmentsService {
     });
 
     return department;
+  }
+
+  async remove(
+    id: string,
+    actor: { accountId: string; characterId?: string | null },
+  ) {
+    const department = await this.requireDepartment(id);
+
+    const transferCount = await this.prismaService.reportTransfer.count({
+      where: { toDepartmentId: id },
+    });
+
+    if (transferCount > 0) {
+      throw new ConflictException(
+        'Cannot delete a department that appears as destination in report transfer history. Deactivate it instead.',
+      );
+    }
+
+    await this.prismaService.department.delete({ where: { id } });
+
+    await this.auditService.create({
+      actorAccountId: actor.accountId,
+      actorCharacterId: actor.characterId ?? null,
+      action: 'departments.delete',
+      targetType: AUDIT_TARGET.DIVISION,
+      targetId: id,
+      metadata: { name: department.name, slug: department.slug },
+    });
+
+    return { id, deleted: true };
   }
 
   async addSupervisor(

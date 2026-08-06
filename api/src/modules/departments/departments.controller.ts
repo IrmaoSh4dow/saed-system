@@ -103,6 +103,19 @@ export class DepartmentsController {
     });
   }
 
+  @Delete(':id')
+  @Permissions('departments.manage')
+  remove(
+    @CurrentAccount() account: IAuthAccount,
+    @CurrentCharacter() character: IAuthCharacter | null,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.departmentsService.remove(id, {
+      accountId: account.id,
+      characterId: character?.id,
+    });
+  }
+
   @Post(':id/supervisors')
   @Permissions('departments.update')
   addSupervisor(

@@ -22,6 +22,11 @@ export async function updateDepartment(departmentId, payload) {
   return unwrap(response);
 }
 
+export async function deleteDepartment(departmentId) {
+  const response = await apiClient.delete(`/departments/${departmentId}`);
+  return unwrap(response);
+}
+
 export async function addDepartmentSupervisor(departmentId, staffProfileId) {
   const response = await apiClient.post(`/departments/${departmentId}/supervisors`, {
     staffProfileId,
