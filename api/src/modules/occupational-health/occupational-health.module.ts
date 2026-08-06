@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
+import { MedicalReportAccessModule } from '../medical-report-access/medical-report-access.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { PatientsModule } from '../patients/patients.module';
@@ -15,6 +16,7 @@ import { PsychotechnicalEvaluationsService } from './psychotechnical-evaluations
     AuditModule,
     NotificationsModule,
     PermissionsModule,
+    MedicalReportAccessModule,
     forwardRef(() => PatientsModule),
   ],
   controllers: [OccupationalHealthController, LspdController],

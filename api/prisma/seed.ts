@@ -202,6 +202,9 @@ const PERMISSIONS = [
   { key: 'medical-record-access.read', description: 'View medical record access requests' },
   { key: 'medical-record-access.request', description: 'Request temporary clinical record access' },
   { key: 'medical-record-access.review', description: 'Approve or reject medical record access requests' },
+  { key: 'medical-report-access.read', description: 'View temporary medical report access grants' },
+  { key: 'medical-report-access.grant', description: 'Grant temporary medical report access to external supervisors' },
+  { key: 'medical-report-access.revoke', description: 'Revoke temporary medical report access grants' },
   { key: 'staff-ratings.create', description: 'Submit medical staff ratings after completed appointments' },
   { key: 'staff-ratings.read', description: 'View medical staff ratings (High Command only)' },
   { key: 'staff-ratings.dashboard', description: 'View hospital-wide ratings analytics' },
@@ -341,6 +344,9 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'regulations.publish',
   'medical-record-access.read',
   'medical-record-access.review',
+  'medical-report-access.read',
+  'medical-report-access.grant',
+  'medical-report-access.revoke',
   'staff-ratings.read',
   'staff-ratings.dashboard',
 ] as const;
@@ -371,6 +377,7 @@ const LSPD_MEDICAL_SUPERVISOR_PERMISSIONS = [
   'occupational-health.interop',
   'medical-record-access.read',
   'medical-record-access.request',
+  'medical-report-access.read',
 ] as const;
 
 const ROLES = [
@@ -749,6 +756,8 @@ async function pruneOperationalData(): Promise<void> {
       "IncentivePayment",
       "StaffShift",
       "MedicalRecordAccessRequest",
+      "MedicalReportAccessViewLog",
+      "MedicalReportAccessGrant",
       "PsychotechnicalEvaluation",
       "MedicalLeave",
       "MedicalRecord",

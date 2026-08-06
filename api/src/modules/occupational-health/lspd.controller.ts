@@ -23,6 +23,7 @@ import type {
   IAuthCharacter,
 } from '../auth/interfaces/i-auth-request.interface';
 import { PatientsService } from '../patients/patients.service';
+import { MedicalReportAccessService } from '../medical-report-access/medical-report-access.service';
 import {
   CreateMedicalRecordAccessDto,
   LspdFinanceQueryDto,
@@ -40,6 +41,7 @@ export class LspdController {
   constructor(
     private readonly occupationalHealthService: OccupationalHealthService,
     private readonly medicalRecordAccessService: MedicalRecordAccessService,
+    private readonly medicalReportAccessService: MedicalReportAccessService,
     private readonly patientsService: PatientsService,
   ) {}
 
@@ -211,6 +213,25 @@ export class LspdController {
       accountId: account.id,
       characterId: character.id,
       permissions: request.user?.permissions ?? [],
+    });
+  }
+
+  @Get('authorized-reports')
+  @Permissions('medical-report-access.read')
+  listAuthorizedReports(@CurrentCharacter() character: IAuthCharacter) {
+    return this.medicalReportAccessService.listAuthorizedForRecipient(character.id);
+  }
+
+  @Get('authorized-reports/:grantId')
+  @Permissions('medical-report-access.read')
+  getAuthorizedReport(
+    @Param('grantId', ParseUUIDPipe) grantId: string,
+    @CurrentAccount() account: IAuthAccount,
+    @CurrentCharacter() character: IAuthCharacter,
+  ) {
+    return this.medicalReportAccessService.getAuthorizedReport(grantId, {
+      accountId: account.id,
+      characterId: character.id,
     });
   }
 }

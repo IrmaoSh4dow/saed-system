@@ -14,9 +14,10 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { TEMPORARY_ACCESS_CONFIG } from '../../common/temporary-access/temporary-access.config';
 import { INSTITUTIONAL_PARTNERS } from './occupational-health.constants';
 
-const ACCESS_DURATION_MS = 24 * 60 * 60 * 1000;
+const ACCESS_DURATION_MS = TEMPORARY_ACCESS_CONFIG.MEDICAL_RECORD_DURATION_MS;
 
 const HIGH_COMMAND_ROLE_SLUGS = [
   'medical-director',

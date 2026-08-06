@@ -150,6 +150,9 @@ enum NotificationType {
   ADMIN_REQUEST_NOTE
   MEDICAL_RECORD_ACCESS_CREATED
   MEDICAL_RECORD_ACCESS_STATUS
+  MEDICAL_REPORT_ACCESS_GRANTED
+  MEDICAL_REPORT_ACCESS_REVOKED
+  MEDICAL_REPORT_ACCESS_EXPIRING
   STAFF_RATING_CREATED
   DEPARTMENT_OPENING
   DEPARTMENT_INTEREST_LETTER
@@ -428,6 +431,10 @@ model Character {
   medicalLeavesCreated       MedicalLeave[]     @relation("MedicalLeaveCreatedBy")
   medicalRecordAccessRequestsFiled    MedicalRecordAccessRequest[] @relation("MedicalRecordAccessRequester")
   medicalRecordAccessRequestsReviewed MedicalRecordAccessRequest[] @relation("MedicalRecordAccessReviewer")
+  medicalReportAccessGrantsReceived   MedicalReportAccessGrant[]   @relation("MedicalReportAccessRecipient")
+  medicalReportAccessGrantsGranted    MedicalReportAccessGrant[]   @relation("MedicalReportAccessGrantedBy")
+  medicalReportAccessGrantsRevoked    MedicalReportAccessGrant[]   @relation("MedicalReportAccessRevokedBy")
+  medicalReportAccessViews            MedicalReportAccessViewLog[] @relation("MedicalReportAccessViewer")
   staffRatingsGiven                   StaffRating[]                @relation("StaffRatingReviewer")
   applicationConfigsOpened            ApplicationConfiguration[]   @relation("ApplicationConfigOpenedBy")
   applicationConfigsClosed            ApplicationConfiguration[]   @relation("ApplicationConfigClosedBy")
@@ -1454,6 +1461,7 @@ model Report {
   participants         ReportParticipant[]
   evidence             ReportEvidence[]
   transfers            ReportTransfer[]
+  accessGrants         MedicalReportAccessGrant[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
@@ -1812,4 +1820,64 @@ model RegulationAttachment {
   createdAt            DateTime           @default(now())
 
   @@index([documentId, sortOrder])
+}
+
+/// Temporary SAED → external agency access to a specific medical report.
+enum MedicalReportAccessGrantStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+/// Extensible reason catalog for medical report interop grants.
+enum MedicalReportAccessReason {
+  CRIMINAL_INVESTIGATION
+  FORENSIC_CASE
+  COURT_ORDER
+  INTERNAL_INVESTIGATION
+  PROSECUTOR_REQUEST
+  OTHER
+}
+
+model MedicalReportAccessGrant {
+  id                    String                         @id @default(uuid())
+  grantNumber           Int                            @unique @default(autoincrement())
+  reportId              String
+  report                Report                         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  recipientCharacterId  String
+  recipientCharacter    Character                      @relation("MedicalReportAccessRecipient", fields: [recipientCharacterId], references: [id], onDelete: Restrict)
+  grantedByCharacterId  String
+  grantedByCharacter    Character                      @relation("MedicalReportAccessGrantedBy", fields: [grantedByCharacterId], references: [id], onDelete: Restrict)
+  organization          String                         @default("LSPD")
+  reason                MedicalReportAccessReason
+  reasonNotes           String?
+  status                MedicalReportAccessGrantStatus @default(ACTIVE)
+  grantedAt             DateTime                       @default(now())
+  expiresAt             DateTime
+  revokedAt             DateTime?
+  revokedByCharacterId  String?
+  revokedByCharacter    Character?                     @relation("MedicalReportAccessRevokedBy", fields: [revokedByCharacterId], references: [id], onDelete: SetNull)
+  viewCount             Int                            @default(0)
+  lastViewedAt          DateTime?
+  viewLogs              MedicalReportAccessViewLog[]
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+
+  @@index([reportId, status])
+  @@index([recipientCharacterId, status, expiresAt])
+  @@index([grantedByCharacterId])
+  @@index([status, expiresAt])
+  @@index([organization, createdAt])
+}
+
+model MedicalReportAccessViewLog {
+  id                String                   @id @default(uuid())
+  grantId           String
+  grant             MedicalReportAccessGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  viewerCharacterId String
+  viewerCharacter   Character                @relation("MedicalReportAccessViewer", fields: [viewerCharacterId], references: [id], onDelete: Restrict)
+  viewedAt          DateTime                 @default(now())
+
+  @@index([grantId, viewedAt])
+  @@index([viewerCharacterId, viewedAt])
 }

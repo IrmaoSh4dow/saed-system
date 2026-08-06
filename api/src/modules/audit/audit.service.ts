@@ -22,6 +22,7 @@ export const AUDIT_TARGET = {
   PSYCHOTECHNICAL_EVALUATION: 'PsychotechnicalEvaluation',
   MEDICAL_LEAVE: 'MedicalLeave',
   MEDICAL_RECORD_ACCESS_REQUEST: 'MedicalRecordAccessRequest',
+  MEDICAL_REPORT_ACCESS_GRANT: 'MedicalReportAccessGrant',
   STAFF_RATING: 'StaffRating',
   PATIENT: 'Patient',
   PATIENT_INVOICE: 'PatientInvoice',

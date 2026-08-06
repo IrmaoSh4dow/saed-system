@@ -18,8 +18,22 @@ import {
   listMedicalRecordAccessRequests,
   rejectMedicalRecordAccessRequest,
 } from '../services/lspd.service.js';
+import {
+  formatRemainingAccess,
+  getAuthorizedMedicalReport,
+  listAuthorizedMedicalReports,
+} from '../services/medical-report-access.service.js';
 import { PSYCHOTECHNICAL_RESULT_LABELS } from '../services/occupational-health.service.js';
 import { PERMISSIONS } from '../utils/permissions.js';
+
+const REPORT_TYPE_LABELS = {
+  CONSULTATION: 'Consulta',
+  DIAGNOSTIC: 'Diagnóstico',
+  PROCEDURE: 'Procedimiento',
+  HOSPITALIZATION: 'Hospitalización',
+  INTERNAL: 'Interno',
+  OTHER: 'Otro',
+};
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -79,21 +93,31 @@ export function lspdPage() {
   const canRequestAccess = can(PERMISSIONS.MEDICAL_RECORD_ACCESS_REQUEST);
   const canReviewAccess = can(PERMISSIONS.MEDICAL_RECORD_ACCESS_REVIEW);
   const canReadAccess = can(PERMISSIONS.MEDICAL_RECORD_ACCESS_READ);
+  const canAuthorizedReports = can(PERMISSIONS.MEDICAL_REPORT_ACCESS_READ);
 
-  if (!canInterop && !canDashboard && !canFinance && !canReadAccess) {
+  if (!canInterop && !canDashboard && !canFinance && !canReadAccess && !canAuthorizedReports) {
     return { html: '', afterMount: () => {} };
   }
 
   const params = new URLSearchParams(window.location.search);
   const initialTab =
     params.get('tab') ||
-    (canInterop ? 'directory' : canFinance ? 'finance' : canReadAccess ? 'access' : 'overview');
+    (canInterop
+      ? 'directory'
+      : canAuthorizedReports
+        ? 'authorized-reports'
+        : canFinance
+          ? 'finance'
+          : canReadAccess
+            ? 'access'
+            : 'overview');
 
   const tabs = [
     canDashboard ? { id: 'overview', label: 'Resumen' } : null,
     canInterop ? { id: 'directory', label: 'Directorio' } : null,
     canFinance ? { id: 'finance', label: 'Facturación' } : null,
     canReadAccess ? { id: 'access', label: 'Expedientes' } : null,
+    canAuthorizedReports ? { id: 'authorized-reports', label: 'Informes Autorizados' } : null,
   ].filter(Boolean);
 
   const content = `
@@ -707,12 +731,181 @@ export function lspdPage() {
         });
       };
 
+      let authorizedCountdownTimer = null;
+
+      const renderAuthorizedReports = async () => {
+        if (authorizedCountdownTimer) {
+          clearInterval(authorizedCountdownTimer);
+          authorizedCountdownTimer = null;
+        }
+
+        const grants = await listAuthorizedMedicalReports();
+        const grantParam = params.get('grant');
+
+        panel.innerHTML = `
+          <div class="space-y-4">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Informes Autorizados</h2>
+                <p class="mt-1 text-sm text-ink-400">
+                  Solo ves los informes médicos que el SAED te ha autorizado expresamente.
+                </p>
+              </div>
+              <p class="text-xs text-ink-500">${grants.length} acceso(s) vigente(s)</p>
+            </div>
+            <div id="authorized-report-list" class="grid gap-3 lg:grid-cols-2">
+              ${
+                grants.length
+                  ? grants
+                      .map((grant) => {
+                        const patient = grant.report?.patient;
+                        const patientName = patient
+                          ? `${patient.firstName} ${patient.lastName}`
+                          : '—';
+                        const lead = grant.report?.leadStaff?.character;
+                        const leadName = lead ? `${lead.firstName} ${lead.lastName}` : '—';
+                        return `
+                          <button type="button" data-open-authorized="${grant.id}"
+                            class="rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left transition hover:border-brand-400/40 hover:bg-brand-500/5">
+                            <div class="flex items-start justify-between gap-3">
+                              <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-300">
+                                  Informe #${grant.report?.reportNumber ?? '—'}
+                                </p>
+                                <p class="mt-2 text-sm font-semibold text-white">${escapeHtml(grant.report?.title || 'Informe médico')}</p>
+                                <p class="mt-1 text-xs text-ink-400">
+                                  ${escapeHtml(patientName)} · ${escapeHtml(REPORT_TYPE_LABELS[grant.report?.type] || grant.report?.type || '—')}
+                                </p>
+                                <p class="mt-1 text-xs text-ink-500">Médico responsable: ${escapeHtml(leadName)}</p>
+                              </div>
+                              <div class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-center">
+                                <p class="text-[10px] uppercase tracking-wide text-amber-200/80">Acceso válido por</p>
+                                <p class="mt-1 text-lg font-semibold text-amber-100" data-remaining-for="${grant.id}">
+                                  ${escapeHtml(formatRemainingAccess(grant.remainingMs))}
+                                </p>
+                              </div>
+                            </div>
+                            <p class="mt-3 text-[11px] text-ink-500">
+                              Autorizado ${escapeHtml(formatDateTimeLabel(grant.grantedAt))}
+                              · Expira ${escapeHtml(formatDateTimeLabel(grant.expiresAt))}
+                            </p>
+                          </button>
+                        `;
+                      })
+                      .join('')
+                  : `<p class="text-sm text-ink-500 lg:col-span-2">No tienes informes autorizados en este momento.</p>`
+              }
+            </div>
+            <div id="authorized-report-detail" class="hidden"></div>
+          </div>
+        `;
+
+        const tick = () => {
+          grants.forEach((grant) => {
+            const el = panel.querySelector(`[data-remaining-for="${grant.id}"]`);
+            if (!el) return;
+            const remaining = Math.max(0, new Date(grant.expiresAt).getTime() - Date.now());
+            grant.remainingMs = remaining;
+            el.textContent = formatRemainingAccess(remaining);
+            if (remaining <= 0) {
+              void renderAuthorizedReports();
+            }
+          });
+        };
+        authorizedCountdownTimer = setInterval(tick, 30000);
+
+        const openAuthorized = async (grantId) => {
+          const detailHost = panel.querySelector('#authorized-report-detail');
+          if (!detailHost) return;
+          detailHost.classList.remove('hidden');
+          detailHost.innerHTML = `<p class="text-sm text-ink-400">Cargando informe autorizado…</p>`;
+          try {
+            const payload = await getAuthorizedMedicalReport(grantId);
+            const { grant, report } = payload;
+            const patient = report?.patient;
+            const patientName = patient
+              ? `HC #${patient.recordNumber} · ${patient.firstName} ${patient.lastName}`
+              : '—';
+            const lead = report?.leadStaff?.character;
+            const leadName = lead ? `${lead.firstName} ${lead.lastName}` : '—';
+
+            detailHost.innerHTML = `
+              <article class="rounded-3xl border border-white/10 bg-surface-950 p-5 md:p-6">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-300">
+                      Acceso temporal · #${report.reportNumber}
+                    </p>
+                    <h3 class="mt-2 text-2xl font-semibold text-white">${escapeHtml(report.title)}</h3>
+                    <p class="mt-2 text-sm text-ink-400">
+                      ${escapeHtml(REPORT_TYPE_LABELS[report.type] || report.type)}
+                      · ${escapeHtml(report.department?.name || 'Sin departamento')}
+                    </p>
+                  </div>
+                  <div class="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-center">
+                    <p class="text-[11px] uppercase tracking-wide text-amber-200/80">Acceso válido por</p>
+                    <p class="mt-1 text-3xl font-semibold tracking-tight text-amber-100" data-detail-remaining>
+                      ${escapeHtml(formatRemainingAccess(grant.remainingMs))}
+                    </p>
+                    <p class="mt-1 text-[11px] text-ink-400">Expira ${escapeHtml(formatDateTimeLabel(grant.expiresAt))}</p>
+                  </div>
+                </div>
+                <dl class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div class="rounded-xl border border-white/10 px-3 py-2"><dt class="text-[11px] text-ink-500">Paciente</dt><dd class="mt-1 text-sm text-white">${escapeHtml(patientName)}</dd></div>
+                  <div class="rounded-xl border border-white/10 px-3 py-2"><dt class="text-[11px] text-ink-500">Médico responsable</dt><dd class="mt-1 text-sm text-white">${escapeHtml(leadName)}</dd></div>
+                  <div class="rounded-xl border border-white/10 px-3 py-2"><dt class="text-[11px] text-ink-500">Fecha del informe</dt><dd class="mt-1 text-sm text-white">${escapeHtml(formatDateTimeLabel(report.createdAt))}</dd></div>
+                  <div class="rounded-xl border border-white/10 px-3 py-2"><dt class="text-[11px] text-ink-500">Autorizado</dt><dd class="mt-1 text-sm text-white">${escapeHtml(formatDateTimeLabel(grant.grantedAt))}</dd></div>
+                </dl>
+                <div class="mt-5 rounded-2xl border border-white/10 bg-black/20 px-4 py-5">
+                  <p class="text-[11px] uppercase tracking-wide text-ink-500">Narrativa clínica</p>
+                  <p class="mt-3 whitespace-pre-wrap text-sm leading-7 text-ink-100">${escapeHtml(report.description || 'Sin descripción.')}</p>
+                </div>
+                <p class="mt-4 text-xs text-ink-500">
+                  Motivo: ${escapeHtml(grant.reasonLabel || grant.reason)}
+                  ${grant.reasonNotes ? ` · ${escapeHtml(grant.reasonNotes)}` : ''}
+                </p>
+              </article>
+            `;
+
+            const detailTick = () => {
+              const el = detailHost.querySelector('[data-detail-remaining]');
+              if (!el) return;
+              const remaining = Math.max(0, new Date(grant.expiresAt).getTime() - Date.now());
+              el.textContent = formatRemainingAccess(remaining);
+              if (remaining <= 0) {
+                detailHost.innerHTML = `
+                  <div class="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-5">
+                    <p class="text-sm font-medium text-rose-200">El acceso temporal ha expirado.</p>
+                    <p class="mt-1 text-xs text-ink-400">Solicita una nueva autorización al Alto Mando del SAED si aún la necesitas.</p>
+                  </div>
+                `;
+                void renderAuthorizedReports();
+              }
+            };
+            detailTick();
+          } catch (error) {
+            detailHost.innerHTML = `<p class="text-sm text-rose-300">${escapeHtml(getApiErrorMessage(error))}</p>`;
+          }
+        };
+
+        panel.querySelectorAll('[data-open-authorized]').forEach((button) => {
+          button.addEventListener('click', () => {
+            void openAuthorized(button.getAttribute('data-open-authorized'));
+          });
+        });
+
+        if (grantParam) {
+          void openAuthorized(grantParam);
+        }
+      };
+
       const renderTab = async () => {
         try {
           if (activeTab === 'overview') await renderOverview();
           else if (activeTab === 'directory') await renderDirectory();
           else if (activeTab === 'finance') await renderFinance({ days: 7 });
           else if (activeTab === 'access') await renderAccess();
+          else if (activeTab === 'authorized-reports') await renderAuthorizedReports();
         } catch (error) {
           panel.innerHTML = `<p class="text-sm text-rose-300">${escapeHtml(getApiErrorMessage(error))}</p>`;
         }
@@ -723,7 +916,10 @@ export function lspdPage() {
         if (patientParam && canInterop) void openAgent(patientParam);
       });
 
-      return cleanupLayout;
+      return () => {
+        if (authorizedCountdownTimer) clearInterval(authorizedCountdownTimer);
+        cleanupLayout();
+      };
     },
   };
 }
