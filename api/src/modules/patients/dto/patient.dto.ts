@@ -7,8 +7,10 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreatePatientDto {
@@ -78,6 +80,21 @@ export class CreatePatientDto {
   @IsString()
   @MaxLength(4000)
   notes?: string;
+
+  @IsOptional()
+  @IsUUID()
+  establishmentId?: string | null;
+
+  /** LSPD institutional badge/placa. Only allowed when establishment is LSPD. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== '')
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  @Matches(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/, {
+    message: 'badgeNumber must look like 1A-12, 3B-45 or ADAM-21',
+  })
+  badgeNumber?: string | null;
 
   @IsOptional()
   @IsUUID()
@@ -166,6 +183,21 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsEnum(PatientStatus)
   status?: PatientStatus;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  establishmentId?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== '')
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  @Matches(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/, {
+    message: 'badgeNumber must look like 1A-12, 3B-45 or ADAM-21',
+  })
+  badgeNumber?: string | null;
 
   @IsOptional()
   @IsUUID()

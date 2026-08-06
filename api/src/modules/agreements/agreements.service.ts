@@ -492,6 +492,47 @@ export class AgreementsService {
   }
 
   /**
+   * Resolves the currently enforceable agreement for an establishment.
+   */
+  async resolveActiveAgreementForEstablishment(
+    establishmentId: string,
+  ): Promise<IActiveAgreementSnapshot | null> {
+    const establishment = await this.prismaService.establishment.findUnique({
+      where: { id: establishmentId },
+      select: {
+        id: true,
+        name: true,
+        agreements: {
+          where: { status: AgreementStatus.ACTIVE },
+          orderBy: { startsAt: 'desc' },
+        },
+      },
+    });
+
+    if (!establishment) {
+      return null;
+    }
+
+    const active = establishment.agreements.find((item) =>
+      isAgreementCurrentlyActive(item),
+    );
+    if (!active) {
+      return null;
+    }
+
+    return {
+      agreementId: active.id,
+      establishmentId: establishment.id,
+      establishmentName: establishment.name,
+      discountPercent: decimalToNumber(active.discountPercent),
+      startsAt: toDateOnlyString(active.startsAt),
+      endsAt: toDateOnlyString(active.endsAt),
+      status: active.status,
+      notes: active.notes,
+    };
+  }
+
+  /**
    * Resolves the currently enforceable agreement for a character via primary/active occupation.
    */
   async resolveActiveAgreementForCharacter(
@@ -520,27 +561,11 @@ export class AgreementsService {
       },
     });
 
-    if (!occupation?.establishment) {
+    if (!occupation?.establishmentId) {
       return null;
     }
 
-    const active = occupation.establishment.agreements.find((item) =>
-      isAgreementCurrentlyActive(item),
-    );
-    if (!active) {
-      return null;
-    }
-
-    return {
-      agreementId: active.id,
-      establishmentId: occupation.establishment.id,
-      establishmentName: occupation.establishment.name,
-      discountPercent: decimalToNumber(active.discountPercent),
-      startsAt: toDateOnlyString(active.startsAt),
-      endsAt: toDateOnlyString(active.endsAt),
-      status: active.status,
-      notes: active.notes,
-    };
+    return this.resolveActiveAgreementForEstablishment(occupation.establishmentId);
   }
 
   async resolveActiveAgreementForPatient(
@@ -548,14 +573,27 @@ export class AgreementsService {
   ): Promise<IActiveAgreementSnapshot | null> {
     const patient = await this.prismaService.patient.findUnique({
       where: { id: patientId },
-      select: { linkedCharacterId: true },
+      select: {
+        establishmentId: true,
+        linkedCharacterId: true,
+      },
     });
 
-    if (!patient?.linkedCharacterId) {
+    if (!patient) {
       return null;
     }
 
-    return this.resolveActiveAgreementForCharacter(patient.linkedCharacterId);
+    // Patient workplace is the source of truth for clinical billing / convenios.
+    if (patient.establishmentId) {
+      return this.resolveActiveAgreementForEstablishment(patient.establishmentId);
+    }
+
+    // Legacy fallback: linked character occupation (pre-patient.establishmentId).
+    if (patient.linkedCharacterId) {
+      return this.resolveActiveAgreementForCharacter(patient.linkedCharacterId);
+    }
+
+    return null;
   }
 
   /** Billing helper: apply active convenio discount and return immutable snapshots. */
@@ -580,26 +618,37 @@ export class AgreementsService {
 
   private async countPatientsWithActiveAgreement(): Promise<number> {
     const today = startOfUtcDay();
+    const agreementFilter = {
+      status: AgreementStatus.ACTIVE,
+      startsAt: { lte: today },
+      OR: [{ endsAt: null }, { endsAt: { gte: today } }],
+    };
+
     const patients = await this.prismaService.patient.findMany({
       where: {
-        linkedCharacterId: { not: null },
-        linkedCharacter: {
-          occupations: {
-            some: {
-              isActive: true,
-              establishmentId: { not: null },
-              establishment: {
-                agreements: {
-                  some: {
-                    status: AgreementStatus.ACTIVE,
-                    startsAt: { lte: today },
-                    OR: [{ endsAt: null }, { endsAt: { gte: today } }],
+        OR: [
+          {
+            establishmentId: { not: null },
+            establishment: {
+              agreements: { some: agreementFilter },
+            },
+          },
+          {
+            establishmentId: null,
+            linkedCharacterId: { not: null },
+            linkedCharacter: {
+              occupations: {
+                some: {
+                  isActive: true,
+                  establishmentId: { not: null },
+                  establishment: {
+                    agreements: { some: agreementFilter },
                   },
                 },
               },
             },
           },
-        },
+        ],
       },
       select: { id: true },
     });

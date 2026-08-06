@@ -11,6 +11,7 @@ import {
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { can } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
+import { listWorkplaces } from '../services/characters.service.js';
 import {
   cancelMedicalLeave,
   completeMedicalLeave,
@@ -32,6 +33,8 @@ import { requireActiveCharacter } from '../utils/auth-guard.js';
 import { formatDateLabel, formatDateTimeLabel } from '../utils/date.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
+const LSPD_SLUG = 'lspd';
+const BADGE_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 export function patientDetailPage(patientId) {
   if (!requireActiveCharacter()) {
     return { html: '', afterMount: () => {} };
@@ -60,25 +63,30 @@ export function patientDetailPage(patientId) {
       const cleanupLayout = initDashboardLayout(root);
       document.title = 'Paciente · SAED';
       let treatments = [];
+      let workplaces = [];
       let searchTimer = null;
 
       const load = async () => {
         try {
-          const [patient, treatmentList] = await Promise.all([
+          const [patient, treatmentList, catalog] = await Promise.all([
             getPatient(patientId),
             canEdit ? listTreatments() : Promise.resolve([]),
+            listWorkplaces().catch(() => ({ civilian: [] })),
           ]);
           treatments = Array.isArray(treatmentList) ? treatmentList : [];
+          workplaces = catalog?.civilian ?? [];
           renderDetail(root, patient, {
             canEdit,
             canManagePsychotechnical,
             canManageLeaves,
             treatments,
+            workplaces,
           });
           bindActions(root, patient, {
             canEdit,
             canManagePsychotechnical,
             canManageLeaves,
+            workplaces,
             reload: load,
             getTimer: () => searchTimer,
             setTimer: (timer) => {
@@ -109,6 +117,7 @@ function renderDetail(root, patient, options = {}) {
     canManagePsychotechnical = false,
     canManageLeaves = false,
     treatments = [],
+    workplaces = [],
   } = options;
   const host = root.querySelector('#patient-detail-root');
   if (!host) return;
@@ -173,6 +182,8 @@ function renderDetail(root, patient, options = {}) {
                 <p class="mt-1 text-sm text-ink-400">
                   ${PATIENT_STATUS_LABELS[patient.status] ?? patient.status}
                   · ${escapeHtml(BLOOD_TYPE_LABELS[patient.bloodType] ?? '—')}
+                  ${patient.establishment?.name ? ` · ${escapeHtml(patient.establishment.name)}` : ''}
+                  ${patient.badgeNumber ? ` · Placa <span class="font-mono text-brand-200">${escapeHtml(patient.badgeNumber)}</span>` : ''}
                   ${patient.allergies ? ' · Alergias' : ''}
                   ${linked ? ` · ${escapeHtml(linked.firstName)} ${escapeHtml(linked.lastName)}` : ' · Sin vínculo'}
                 </p>
@@ -345,6 +356,8 @@ function renderDetail(root, patient, options = {}) {
               ${metaCard('Teléfono', patient.phone ?? '—')}
               ${metaCard('Documento', patient.identityDocument ?? '—')}
               ${metaCard('Nacionalidad', patient.nationality ?? '—')}
+              ${metaCard('Organización', patient.establishment?.name ?? 'Sin organización')}
+              ${metaCard('Placa LSPD', patient.badgeNumber ?? '—')}
               ${metaCard('Contacto emergencia', patient.emergencyContactName ?? '—')}
               ${metaCard('Tel. emergencia', patient.emergencyContactPhone ?? '—')}
               ${metaCard('Actualizado', formatDateTimeLabel(patient.updatedAt))}
@@ -475,6 +488,31 @@ function renderDetail(root, patient, options = {}) {
                 <div>
                   <label class="form-label" for="edit-document">Documento</label>
                   <input id="edit-document" class="form-input" value="${escapeAttr(patient.identityDocument ?? '')}" />
+                </div>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="form-label" for="edit-establishment">Organización / establecimiento</label>
+                  <select id="edit-establishment" class="form-input">
+                    <option value="">Sin organización</option>
+                    ${workplaces
+                      .map(
+                        (item) =>
+                          `<option value="${escapeAttr(item.id)}" data-slug="${escapeAttr(item.slug)}" ${
+                            patient.establishmentId === item.id ? 'selected' : ''
+                          }>${escapeHtml(item.name)}</option>`,
+                      )
+                      .join('')}
+                  </select>
+                </div>
+                <div id="edit-badge-wrap" class="${
+                  patient.establishment?.slug === LSPD_SLUG ? '' : 'hidden'
+                }">
+                  <label class="form-label" for="edit-badge">Placa LSPD</label>
+                  <input id="edit-badge" class="form-input font-mono tracking-wide" maxlength="32" value="${escapeAttr(
+                    patient.badgeNumber ?? '',
+                  )}" placeholder="Ej. 1A-12" />
+                  <p class="form-hint">Se elimina automáticamente si el paciente deja el LSPD.</p>
                 </div>
               </div>
               <div class="grid gap-4 sm:grid-cols-2">
@@ -838,11 +876,23 @@ function bindActions(root, patient, options = {}) {
     canEdit = false,
     canManagePsychotechnical = false,
     canManageLeaves = false,
+    workplaces = [],
     reload,
     getTimer,
     setTimer,
   } = options;
 
+  const syncEditBadgeVisibility = () => {
+    const select = root.querySelector('#edit-establishment');
+    const wrap = root.querySelector('#edit-badge-wrap');
+    const badgeInput = root.querySelector('#edit-badge');
+    const option = select?.selectedOptions?.[0];
+    const isLspd = option?.getAttribute('data-slug') === LSPD_SLUG;
+    wrap?.classList.toggle('hidden', !isLspd);
+    if (!isLspd && badgeInput) {
+      badgeInput.value = '';
+    }
+  };
   root.querySelector('#psychotechnical-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!canManagePsychotechnical) return;
@@ -942,9 +992,22 @@ function bindActions(root, patient, options = {}) {
   root.querySelector('#cancel-patient-edit')?.addEventListener('click', () => {
     root.querySelector('#patient-edit-form')?.classList.add('hidden');
   });
+  root.querySelector('#edit-establishment')?.addEventListener('change', syncEditBadgeVisibility);
 
   root.querySelector('#patient-edit-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const establishmentId = root.querySelector('#edit-establishment')?.value || null;
+    const selected = workplaces.find((item) => item.id === establishmentId);
+    const isLspd = selected?.slug === LSPD_SLUG;
+    const badgeRaw = root.querySelector('#edit-badge')?.value?.trim() ?? '';
+    if (isLspd && badgeRaw && !BADGE_PATTERN.test(badgeRaw.toUpperCase())) {
+      setAuthAlert(root, {
+        id: 'patient-detail-alert',
+        type: 'error',
+        message: 'La placa debe tener un formato como 1A-12, 3B-45 o ADAM-21.',
+      });
+      return;
+    }
     try {
       await updatePatient(patient.id, {
         firstName: root.querySelector('#edit-first-name').value.trim(),
@@ -956,6 +1019,8 @@ function bindActions(root, patient, options = {}) {
         chronicConditions: root.querySelector('#edit-chronic').value.trim() || null,
         notes: root.querySelector('#edit-notes').value.trim() || null,
         status: root.querySelector('#edit-status').value,
+        establishmentId,
+        badgeNumber: isLspd ? badgeRaw.toUpperCase() || null : null,
       });
       setAuthAlert(root, {
         id: 'patient-detail-alert',

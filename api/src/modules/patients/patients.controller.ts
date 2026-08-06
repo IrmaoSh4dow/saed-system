@@ -121,10 +121,12 @@ export class PatientsController {
   @Permissions('patients.update')
   createInvoice(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentAccount() account: IAuthAccount,
     @CurrentCharacter() character: IAuthCharacter,
     @Body() dto: CreatePatientInvoiceDto,
   ) {
     return this.patientsService.createInvoice(id, dto, {
+      accountId: account.id,
       characterId: character.id,
     });
   }

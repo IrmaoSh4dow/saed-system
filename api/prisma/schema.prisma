@@ -485,6 +485,7 @@ model Establishment {
   sortOrder       Int                 @default(0)
   occupations     Occupation[]
   agreements      Agreement[]
+  patients        Patient[]
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -842,6 +843,11 @@ model Patient {
   notes                 String?
   avatarUrl             String?
   status                PatientStatus  @default(ACTIVE)
+  /// Workplace / organization belonging to this clinical record (independent of Character).
+  establishmentId       String?
+  establishment         Establishment? @relation(fields: [establishmentId], references: [id], onDelete: SetNull)
+  /// Institutional badge/placa — only meaningful for LSPD patients; cleared when leaving LSPD.
+  badgeNumber           String?
   /// Optional link to a playable Character. Never required.
   linkedCharacterId     String?        @unique
   linkedCharacter       Character?     @relation("PatientLinkedCharacter", fields: [linkedCharacterId], references: [id], onDelete: SetNull)
@@ -869,6 +875,8 @@ model Patient {
   @@index([phone])
   @@index([identityDocument])
   @@index([status])
+  @@index([establishmentId])
+  @@index([badgeNumber])
   @@index([createdAt])
 }
 

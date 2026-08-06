@@ -7,12 +7,18 @@ import {
 import { BloodType, PatientStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AgreementsService } from '../agreements/agreements.service';
+import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
 import { OccupationalHealthService } from '../occupational-health/occupational-health.service';
 import {
   CreatePatientInvoiceDto,
   LinkPatientCharacterDto,
 } from './dto/patient-invoice.dto';
 import { CreatePatientDto, SearchPatientsDto, UpdatePatientDto } from './dto/patient.dto';
+import {
+  isLspdEstablishment,
+  isValidBadgeNumber,
+  normalizeBadgeNumber,
+} from './utils/patient-establishment.util';
 import {
   buildNormalizedFullName,
   buildPatientSearchKey,
@@ -24,6 +30,15 @@ import {
 } from './utils/patient-identity.util';
 
 const patientInclude = {
+  establishment: {
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      logoUrl: true,
+      defaultPosition: true,
+    },
+  },
   linkedCharacter: {
     select: {
       id: true,
@@ -49,6 +64,7 @@ export class PatientsService {
     private readonly prismaService: PrismaService,
     private readonly agreementsService: AgreementsService,
     private readonly occupationalHealthService: OccupationalHealthService,
+    private readonly auditService: AuditService,
   ) {}
 
   async list(query: SearchPatientsDto = {}) {
@@ -313,7 +329,7 @@ export class PatientsService {
   async createInvoice(
     patientId: string,
     dto: CreatePatientInvoiceDto,
-    actor: { characterId: string },
+    actor: { accountId: string; characterId: string },
   ) {
     await this.requirePatient(patientId);
 
@@ -361,6 +377,26 @@ export class PatientsService {
         agreement: {
           select: { id: true, discountPercent: true, status: true },
         },
+      },
+    });
+
+    await this.auditService.create({
+      actorAccountId: actor.accountId,
+      actorCharacterId: actor.characterId,
+      action: 'patients.invoice_created',
+      targetType: AUDIT_TARGET.PATIENT_INVOICE,
+      targetId: invoice.id,
+      metadata: {
+        patientId,
+        treatmentId: treatment.id,
+        treatmentName: treatment.name,
+        originalAmount: billing.originalAmount,
+        discountPercent: billing.discountPercent,
+        discountAmount: billing.discountAmount,
+        amount: billing.finalAmount,
+        agreementId: billing.agreementId,
+        establishmentName: billing.establishmentName,
+        billingOrganization: institutionalBilling.organization,
       },
     });
 
@@ -434,6 +470,11 @@ export class PatientsService {
       });
     }
 
+    const workplace = await this.resolveWorkplaceFields({
+      establishmentId: payload.establishmentId,
+      badgeNumber: payload.badgeNumber,
+    });
+
     const searchKey = buildPatientSearchKey(payload);
 
     try {
@@ -453,12 +494,27 @@ export class PatientsService {
           emergencyContactName: payload.emergencyContactName,
           emergencyContactPhone: payload.emergencyContactPhone,
           notes: payload.notes,
+          establishmentId: workplace.establishmentId,
+          badgeNumber: workplace.badgeNumber,
           linkedCharacterId: payload.linkedCharacterId,
           searchKey,
           createdByCharacterId: actor.characterId,
           updatedByCharacterId: actor.characterId,
         },
         include: patientInclude,
+      });
+
+      await this.auditService.create({
+        actorAccountId: actor.accountId,
+        actorCharacterId: actor.characterId,
+        action: 'patients.created',
+        targetType: AUDIT_TARGET.PATIENT,
+        targetId: created.id,
+        metadata: {
+          recordNumber: created.recordNumber,
+          establishmentId: workplace.establishmentId,
+          badgeNumber: workplace.badgeNumber,
+        },
       });
 
       return this.toDetail(created);
@@ -528,6 +584,16 @@ export class PatientsService {
           : dto.linkedCharacterId,
     };
 
+    const workplace = await this.resolveWorkplaceFields({
+      establishmentId:
+        dto.establishmentId === undefined
+          ? existing.establishmentId
+          : dto.establishmentId,
+      badgeNumber:
+        dto.badgeNumber === undefined ? existing.badgeNumber : dto.badgeNumber,
+      allowMissingEstablishment: true,
+    });
+
     await this.assertLinkedCharacter(merged.linkedCharacterId, id);
 
     const duplicates = await this.findDuplicateCandidates({
@@ -553,17 +619,54 @@ export class PatientsService {
     }
 
     const searchKey = buildPatientSearchKey(merged);
+    const previousEstablishmentId = existing.establishmentId;
+    const previousBadgeNumber = existing.badgeNumber;
 
     try {
       const updated = await this.prismaService.patient.update({
         where: { id },
         data: {
           ...merged,
+          establishmentId: workplace.establishmentId,
+          badgeNumber: workplace.badgeNumber,
           searchKey,
           updatedByCharacterId: actor.characterId,
         },
         include: patientInclude,
       });
+
+      const organizationChanged = previousEstablishmentId !== workplace.establishmentId;
+      const badgeChanged = previousBadgeNumber !== workplace.badgeNumber;
+
+      if (organizationChanged || badgeChanged) {
+        await this.auditService.create({
+          actorAccountId: actor.accountId,
+          actorCharacterId: actor.characterId,
+          action: organizationChanged
+            ? 'patients.organization_updated'
+            : 'patients.badge_updated',
+          targetType: AUDIT_TARGET.PATIENT,
+          targetId: id,
+          metadata: {
+            previousEstablishmentId,
+            establishmentId: workplace.establishmentId,
+            previousBadgeNumber,
+            badgeNumber: workplace.badgeNumber,
+            badgeCleared:
+              Boolean(previousBadgeNumber) && !workplace.badgeNumber && organizationChanged,
+          },
+        });
+      } else {
+        await this.auditService.create({
+          actorAccountId: actor.accountId,
+          actorCharacterId: actor.characterId,
+          action: 'patients.updated',
+          targetType: AUDIT_TARGET.PATIENT,
+          targetId: id,
+          metadata: { recordNumber: updated.recordNumber },
+        });
+      }
+
       return this.toDetail(updated);
     } catch (error) {
       if (
@@ -852,7 +955,57 @@ export class PatientsService {
       emergencyContactName: dto.emergencyContactName?.trim() || null,
       emergencyContactPhone: dto.emergencyContactPhone?.trim() || null,
       notes: dto.notes?.trim() || null,
+      establishmentId: dto.establishmentId ?? null,
+      badgeNumber: dto.badgeNumber ?? null,
       linkedCharacterId: dto.linkedCharacterId ?? null,
+    };
+  }
+
+  /**
+   * Resolves establishment + badge rules:
+   * - badge only allowed for LSPD
+   * - leaving LSPD auto-clears badge
+   */
+  private async resolveWorkplaceFields(input: {
+    establishmentId?: string | null;
+    badgeNumber?: string | null;
+    allowMissingEstablishment?: boolean;
+  }) {
+    const establishmentId = input.establishmentId ?? null;
+    let establishment: { id: string; slug: string; name: string } | null = null;
+
+    if (establishmentId) {
+      establishment = await this.prismaService.establishment.findFirst({
+        where: { id: establishmentId },
+        select: { id: true, slug: true, name: true },
+      });
+      if (!establishment) {
+        throw new BadRequestException('Establishment was not found');
+      }
+    } else if (!input.allowMissingEstablishment && input.badgeNumber) {
+      throw new BadRequestException(
+        'badgeNumber requires an LSPD establishment on the patient',
+      );
+    }
+
+    const isLspd = isLspdEstablishment(establishment);
+    const requestedBadge = normalizeBadgeNumber(input.badgeNumber);
+
+    if (requestedBadge && !isLspd) {
+      throw new BadRequestException(
+        'La placa institucional solo puede asignarse a pacientes del LSPD',
+      );
+    }
+
+    if (requestedBadge && !isValidBadgeNumber(requestedBadge)) {
+      throw new BadRequestException(
+        'badgeNumber must look like 1A-12, 3B-45 or ADAM-21',
+      );
+    }
+
+    return {
+      establishmentId: establishment?.id ?? null,
+      badgeNumber: isLspd ? requestedBadge : null,
     };
   }
 
@@ -886,6 +1039,9 @@ export class PatientsService {
       allergies: patient.allergies,
       status: patient.status,
       avatarUrl: patient.avatarUrl,
+      establishmentId: patient.establishmentId,
+      establishment: patient.establishment,
+      badgeNumber: patient.badgeNumber,
       linkedCharacterId: patient.linkedCharacterId,
       linkedCharacter: patient.linkedCharacter,
       createdAt: patient.createdAt.toISOString(),
@@ -907,12 +1063,16 @@ export class PatientsService {
 
   /**
    * Snapshot of the patient's employment institution at billing time.
-   * Historical finance reports must never depend on the character's later job changes.
+   * Prefer Patient.establishmentId; fall back to linked character occupation for legacy rows.
    */
   private async resolveInstitutionalBillingSnapshot(patientId: string) {
     const patient = await this.prismaService.patient.findUnique({
       where: { id: patientId },
       select: {
+        establishmentId: true,
+        establishment: {
+          select: { id: true, slug: true, name: true },
+        },
         linkedCharacter: {
           select: {
             occupations: {
@@ -929,6 +1089,14 @@ export class PatientsService {
         },
       },
     });
+
+    if (patient?.establishment) {
+      return {
+        organization: patient.establishment.name,
+        establishmentId: patient.establishment.id,
+        establishmentSlug: patient.establishment.slug,
+      };
+    }
 
     const occupation = patient?.linkedCharacter?.occupations?.[0];
     if (!occupation) {

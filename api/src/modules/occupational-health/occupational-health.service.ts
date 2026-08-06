@@ -198,16 +198,34 @@ export class OccupationalHealthService {
     const patients = await this.prismaService.patient.findMany({
       where: {
         status: 'ACTIVE',
-        linkedCharacterId: { not: null },
-        linkedCharacter: {
-          occupations: { some: occupationFilter },
-        },
+        OR: [
+          {
+            establishment: {
+              OR: [
+                { slug: partner.slug },
+                { name: { in: [...partner.aliases], mode: 'insensitive' } },
+              ],
+            },
+          },
+          {
+            establishmentId: null,
+            linkedCharacterId: { not: null },
+            linkedCharacter: {
+              occupations: { some: occupationFilter },
+            },
+          },
+        ],
         ...(term
           ? {
-              OR: [
-                { firstName: { contains: term, mode: 'insensitive' } },
-                { lastName: { contains: term, mode: 'insensitive' } },
-                { searchKey: { contains: term.toLowerCase() } },
+              AND: [
+                {
+                  OR: [
+                    { firstName: { contains: term, mode: 'insensitive' } },
+                    { lastName: { contains: term, mode: 'insensitive' } },
+                    { searchKey: { contains: term.toLowerCase() } },
+                    { badgeNumber: { contains: term, mode: 'insensitive' } },
+                  ],
+                },
               ],
             }
           : {}),
@@ -218,11 +236,17 @@ export class OccupationalHealthService {
         firstName: true,
         lastName: true,
         middleName: true,
+        avatarUrl: true,
+        badgeNumber: true,
+        establishment: {
+          select: { id: true, slug: true, name: true },
+        },
         linkedCharacter: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
+            avatarUrl: true,
             occupations: {
               where: { isActive: true },
               orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
@@ -283,9 +307,14 @@ export class OccupationalHealthService {
           fullName: [patient.firstName, patient.middleName, patient.lastName]
             .filter(Boolean)
             .join(' '),
+          avatarUrl: patient.avatarUrl ?? patient.linkedCharacter?.avatarUrl ?? null,
+          badgeNumber: patient.badgeNumber ?? null,
           characterId: patient.linkedCharacter?.id ?? null,
           organization:
-            occupation?.establishment?.name ?? occupation?.organization ?? partner.name,
+            patient.establishment?.name ??
+            occupation?.establishment?.name ??
+            occupation?.organization ??
+            partner.name,
           position: occupation?.position ?? null,
           psychotechnical: evaluation
             ? {

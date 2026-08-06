@@ -242,7 +242,12 @@ export function lspdPage() {
               <div class="space-y-5">
                 <div>
                   <p class="text-xs text-ink-500">HC #${agent.recordNumber}</p>
-                  <p class="mt-1 text-sm text-ink-300">${escapeHtml(agent.organization)}${agent.position ? ` · ${escapeHtml(agent.position)}` : ''}</p>
+                  ${
+                    agent.badgeNumber
+                      ? `<p class="mt-2 inline-flex items-center rounded-lg border border-brand-400/40 bg-brand-500/15 px-3 py-1.5 font-mono text-sm font-semibold tracking-wider text-brand-100">${escapeHtml(agent.badgeNumber)}</p>`
+                      : ''
+                  }
+                  <p class="mt-2 text-sm text-ink-300">${escapeHtml(agent.organization)}${agent.position ? ` · ${escapeHtml(agent.position)}` : ''}</p>
                   <div class="mt-4">${renderInteropIndicators(agent)}</div>
                 </div>
                 <dl class="grid grid-cols-2 gap-3 text-sm">
@@ -427,15 +432,24 @@ export function lspdPage() {
                           <div class="pointer-events-none absolute inset-0 bg-gradient-to-br ${accent}"></div>
                           <div class="relative p-5">
                             <div class="flex items-start gap-3">
-                              <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/30 text-sm font-semibold text-brand-300">
-                                ${escapeHtml(initials || 'L')}
+                              <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/30 text-sm font-semibold text-brand-300">
+                                ${
+                                  item.avatarUrl
+                                    ? `<img src="${escapeHtml(item.avatarUrl)}" alt="" class="h-full w-full object-cover" />`
+                                    : escapeHtml(initials || 'L')
+                                }
                               </div>
                               <div class="min-w-0 flex-1">
                                 <div class="flex items-start justify-between gap-2">
                                   <p class="truncate text-base font-semibold tracking-tight text-white">${escapeHtml(item.fullName)}</p>
                                   <span class="shrink-0 rounded-md border border-white/10 px-1.5 py-0.5 text-[10px] text-ink-500">HC ${item.recordNumber}</span>
                                 </div>
-                                <p class="mt-1 truncate text-xs text-ink-400">
+                                ${
+                                  item.badgeNumber
+                                    ? `<p class="mt-2 inline-flex max-w-full items-center rounded-md border border-brand-400/35 bg-brand-500/15 px-2.5 py-1 font-mono text-sm font-semibold tracking-wider text-brand-100">${escapeHtml(item.badgeNumber)}</p>`
+                                    : `<p class="mt-2 text-xs text-ink-500">Sin placa registrada</p>`
+                                }
+                                <p class="mt-1.5 truncate text-xs text-ink-400">
                                   ${escapeHtml(item.organization)}${item.position ? ` · ${escapeHtml(item.position)}` : ''}
                                 </p>
                               </div>

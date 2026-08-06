@@ -7,10 +7,14 @@ import {
 } from '../components/patients/patient-card.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
+import { listWorkplaces } from '../services/characters.service.js';
 import { createPatient, searchPatients } from '../services/patients.service.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 import { navigate } from '../utils/router.js';
+
+const LSPD_SLUG = 'lspd';
+const BADGE_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 
 export function createPatientPage() {
   if (!requireActiveCharacter()) {
@@ -114,6 +118,23 @@ export function createPatientPage() {
                   <input id="patient-emergency-phone" class="form-input" maxlength="40" />
                 </div>
               </div>
+              <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 space-y-4">
+                <div>
+                  <p class="text-sm font-semibold text-white">Organización / establecimiento</p>
+                  <p class="mt-1 text-xs text-ink-500">Independiente del personaje. Se usa para convenios y directorio LSPD.</p>
+                </div>
+                <div>
+                  <label class="form-label" for="patient-establishment">Establecimiento</label>
+                  <select id="patient-establishment" class="form-input">
+                    <option value="">Sin organización</option>
+                  </select>
+                </div>
+                <div id="patient-badge-wrap" class="hidden">
+                  <label class="form-label" for="patient-badge">Placa LSPD</label>
+                  <input id="patient-badge" class="form-input font-mono tracking-wide" maxlength="32" placeholder="Ej. 1A-12 / ADAM-21" autocomplete="off" />
+                  <p class="form-hint">Opcional. Solo disponible para pacientes del LSPD.</p>
+                </div>
+              </div>
               <div>
                 <label class="form-label" for="patient-notes">Notas clínicas iniciales</label>
                 <textarea id="patient-notes" class="form-input min-h-[100px] resize-y" maxlength="4000"></textarea>
@@ -161,24 +182,62 @@ export function createPatientPage() {
       const cleanup = initDashboardLayout(root);
       document.title = 'Registrar paciente · SAED';
       let searchTimer = null;
+      let workplaces = [];
 
-      const readPayload = (forceCreate = false) => ({
-        firstName: root.querySelector('#patient-first-name').value.trim(),
-        lastName: root.querySelector('#patient-last-name').value.trim(),
-        middleName: root.querySelector('#patient-middle-name').value.trim() || undefined,
-        birthDate: root.querySelector('#patient-birth-date').value || undefined,
-        sex: root.querySelector('#patient-sex').value || undefined,
-        bloodType: root.querySelector('#patient-blood').value || undefined,
-        nationality: root.querySelector('#patient-nationality').value.trim() || undefined,
-        phone: root.querySelector('#patient-phone').value.trim() || undefined,
-        identityDocument: root.querySelector('#patient-document').value.trim() || undefined,
-        allergies: root.querySelector('#patient-allergies').value.trim() || undefined,
-        chronicConditions: root.querySelector('#patient-chronic').value.trim() || undefined,
-        emergencyContactName: root.querySelector('#patient-emergency-name').value.trim() || undefined,
-        emergencyContactPhone: root.querySelector('#patient-emergency-phone').value.trim() || undefined,
-        notes: root.querySelector('#patient-notes').value.trim() || undefined,
-        forceCreate: forceCreate || Boolean(root.querySelector('#force-create')?.checked),
-      });
+      const syncBadgeVisibility = () => {
+        const select = root.querySelector('#patient-establishment');
+        const wrap = root.querySelector('#patient-badge-wrap');
+        const badgeInput = root.querySelector('#patient-badge');
+        const selected = workplaces.find((item) => item.id === select?.value);
+        const isLspd = selected?.slug === LSPD_SLUG;
+        wrap?.classList.toggle('hidden', !isLspd);
+        if (!isLspd && badgeInput) {
+          badgeInput.value = '';
+        }
+      };
+
+      void listWorkplaces()
+        .then((catalog) => {
+          workplaces = catalog?.civilian ?? [];
+          const select = root.querySelector('#patient-establishment');
+          if (!select) return;
+          select.innerHTML = [
+            '<option value="">Sin organización</option>',
+            ...workplaces.map(
+              (item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`,
+            ),
+          ].join('');
+          syncBadgeVisibility();
+        })
+        .catch(() => {});
+
+      root.querySelector('#patient-establishment')?.addEventListener('change', syncBadgeVisibility);
+
+      const readPayload = (forceCreate = false) => {
+        const establishmentId = root.querySelector('#patient-establishment')?.value || undefined;
+        const selected = workplaces.find((item) => item.id === establishmentId);
+        const isLspd = selected?.slug === LSPD_SLUG;
+        const badgeRaw = root.querySelector('#patient-badge')?.value?.trim() ?? '';
+        return {
+          firstName: root.querySelector('#patient-first-name').value.trim(),
+          lastName: root.querySelector('#patient-last-name').value.trim(),
+          middleName: root.querySelector('#patient-middle-name').value.trim() || undefined,
+          birthDate: root.querySelector('#patient-birth-date').value || undefined,
+          sex: root.querySelector('#patient-sex').value || undefined,
+          bloodType: root.querySelector('#patient-blood').value || undefined,
+          nationality: root.querySelector('#patient-nationality').value.trim() || undefined,
+          phone: root.querySelector('#patient-phone').value.trim() || undefined,
+          identityDocument: root.querySelector('#patient-document').value.trim() || undefined,
+          allergies: root.querySelector('#patient-allergies').value.trim() || undefined,
+          chronicConditions: root.querySelector('#patient-chronic').value.trim() || undefined,
+          emergencyContactName: root.querySelector('#patient-emergency-name').value.trim() || undefined,
+          emergencyContactPhone: root.querySelector('#patient-emergency-phone').value.trim() || undefined,
+          notes: root.querySelector('#patient-notes').value.trim() || undefined,
+          establishmentId,
+          badgeNumber: isLspd && badgeRaw ? badgeRaw.toUpperCase() : undefined,
+          forceCreate: forceCreate || Boolean(root.querySelector('#force-create')?.checked),
+        };
+      };
 
       const runMatchSearch = async () => {
         const firstName = root.querySelector('#patient-first-name')?.value?.trim() ?? '';
@@ -243,6 +302,15 @@ export function createPatientPage() {
             id: 'create-patient-alert',
             type: 'error',
             message: 'Nombre y apellidos son obligatorios.',
+          });
+          return;
+        }
+
+        if (payload.badgeNumber && !BADGE_PATTERN.test(payload.badgeNumber)) {
+          setAuthAlert(root, {
+            id: 'create-patient-alert',
+            type: 'error',
+            message: 'La placa debe tener un formato como 1A-12, 3B-45 o ADAM-21.',
           });
           return;
         }
