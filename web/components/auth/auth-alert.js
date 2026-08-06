@@ -2,7 +2,7 @@ import { icon } from '../landing/icons.js';
 
 export function renderAuthAlert({ type = 'info', message = '', id = 'auth-alert' } = {}) {
   if (!message) {
-    return `<div id="${id}" class="hidden" role="status" aria-live="polite"></div>`;
+    return `<div id="${id}" class="auth-alert-host hidden" role="status" aria-live="polite"></div>`;
   }
 
   const styles = {
@@ -32,10 +32,15 @@ export function setAuthAlert(root, { type = 'info', message = '', id = 'auth-ale
   }
 
   if (!message) {
-    host.className = 'hidden';
+    host.className = 'auth-alert-host hidden';
     host.innerHTML = '';
     return;
   }
 
-  host.outerHTML = renderAuthAlert({ type, message, id });
+  const next = renderAuthAlert({ type, message, id });
+  host.outerHTML = next;
+  const painted = root.querySelector(`#${id}`);
+  if (painted) {
+    requestAnimationFrame(() => painted.classList.add('is-visible'));
+  }
 }

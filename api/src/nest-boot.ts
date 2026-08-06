@@ -2,8 +2,10 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter, NestExpressApplication } from '@nestjs/platform-express';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import helmet from 'helmet';
 import express, { RequestHandler } from 'express';
+import type { Server as HttpServer } from 'node:http';
 import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -11,12 +13,17 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 /**
  * Builds the Nest/Express request handler without calling listen().
- * Listening is owned by server.cjs so Railway always has an open PORT.
+ * Listening is owned by server.cjs / main.ts so Railway always has an open PORT.
+ *
+ * Pass the same `http.Server` that accepts connections so Socket.IO shares
+ * that transport (otherwise REST works but realtime chat never reaches clients).
  *
  * Database migrations and seeds are never run on boot — apply them
  * intentionally via ops scripts when schema changes are approved.
  */
-export async function attachNestToServer(): Promise<RequestHandler> {
+export async function attachNestToServer(
+  httpServer?: HttpServer,
+): Promise<RequestHandler> {
   const logger = new Logger('NestBoot');
   const expressApp = express();
 
@@ -26,6 +33,15 @@ export async function attachNestToServer(): Promise<RequestHandler> {
     new ExpressAdapter(expressApp),
     { abortOnError: false, bodyParser: false },
   );
+
+  if (httpServer) {
+    app.useWebSocketAdapter(new IoAdapter(httpServer));
+    logger.log('Socket.IO IoAdapter attached to listening HTTP server');
+  } else {
+    logger.warn(
+      'attachNestToServer called without http.Server — Socket.IO may not receive upgrades',
+    );
+  }
 
   // License (and similar) catalog images are sent as Base64 data URLs in JSON.
   // 8 MB decoded ≈ ~11 MB Base64; keep headroom for the rest of the payload.

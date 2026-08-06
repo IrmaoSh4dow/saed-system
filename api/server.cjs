@@ -89,7 +89,7 @@ async function loadNest() {
     if (typeof mod.attachNestToServer !== 'function') {
       throw new Error('dist/nest-boot.js did not export attachNestToServer');
     }
-    state.nestHandler = await mod.attachNestToServer();
+    state.nestHandler = await mod.attachNestToServer(server);
     state.nestReady = true;
     console.log(JSON.stringify({ msg: 'nest_ready' }));
   } catch (error) {

@@ -43,7 +43,7 @@ export function adminAccountsPage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'admin-accounts-alert' })}
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h3 class="text-sm font-semibold text-white">Cuentas del sistema</h3>
@@ -184,7 +184,7 @@ function renderAccountDetail(account) {
   const characters = account.characters ?? [];
 
   return `
-    <section class="surface-card p-6 md:p-8">
+    <section class="panel p-6 md:p-8">
       <p class="landing-eyebrow">Cuenta</p>
       <h3 class="mt-1 text-2xl font-semibold text-white">${escapeHtml(account.username)}</h3>
       <p class="mt-2 text-sm text-ink-300">${escapeHtml(account.displayName ?? 'Sin nombre visible')}</p>
@@ -196,7 +196,7 @@ function renderAccountDetail(account) {
       </dl>
     </section>
 
-    <section class="surface-card p-6">
+    <section class="panel p-6">
       <h3 class="text-sm font-semibold text-white">Personajes asociados</h3>
       <div class="mt-4 overflow-x-auto">
         ${
@@ -241,7 +241,7 @@ function renderAccountDetail(account) {
       </div>
     </section>
 
-    <section class="surface-card p-6">
+    <section class="panel p-6">
       <h3 class="text-sm font-semibold text-white">Restablecer contraseña</h3>
       <p class="mt-1 text-xs text-ink-400">La nueva contraseña se almacena con Argon2. Se invalidarán las sesiones activas.</p>
       <form id="reset-password-form" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>

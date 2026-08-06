@@ -236,7 +236,7 @@ export class LicensesService {
       },
     });
     if (!officer) {
-      throw new NotFoundException('Officer profile was not found');
+      throw new NotFoundException('Staff profile was not found');
     }
 
     const license = await this.prismaService.license.findFirst({
@@ -252,7 +252,7 @@ export class LicensesService {
       },
     });
     if (existing) {
-      throw new ConflictException('Officer already has this license');
+      throw new ConflictException('Staff member already has this license');
     }
 
     const assignment = await this.prismaService.staffLicense.create({
@@ -286,7 +286,7 @@ export class LicensesService {
         licenseName: license.name,
         officerName,
         notes: notes?.trim() || null,
-        message: `Se asignó licencia ${license.code} al oficial ${officerName}`,
+        message: `Se asignó licencia ${license.code} al personal ${officerName}`,
       },
     });
 
@@ -309,7 +309,7 @@ export class LicensesService {
       },
     });
     if (!existing) {
-      throw new NotFoundException('Officer license was not found');
+      throw new NotFoundException('Staff license was not found');
     }
 
     await this.prismaService.staffLicense.delete({
@@ -333,7 +333,7 @@ export class LicensesService {
         licenseCode,
         licenseName: existing.license?.name ?? null,
         officerName,
-        message: `Se retiró licencia ${licenseCode} al oficial ${officerName}`,
+        message: `Se retiró licencia ${licenseCode} al personal ${officerName}`,
       },
     });
 

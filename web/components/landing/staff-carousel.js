@@ -5,19 +5,19 @@ export function renderOfficerCarousel(officers = []) {
 
   return `
     <section id="personal" class="landing-section relative overflow-hidden">
-      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08),_transparent_55%)]"></div>
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(217,30,30),0.1),_transparent_55%)]"></div>
       <div class="landing-container relative">
         <div class="mb-12 flex flex-col gap-6 md:flex-row md:items-end md:justify-between" data-reveal>
           <div>
-            <p class="landing-eyebrow">Mando</p>
-            <h2 class="landing-title">Nuestro personal</h2>
-            <p class="landing-lead">Los perfiles que sostienen la autoridad operativa del departamento.</p>
+            <p class="landing-eyebrow">Equipo</p>
+            <h2 class="landing-title">Personal médico</h2>
+            <p class="landing-lead">Profesionales del SAED que lideran la atención sanitaria.</p>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" id="officer-prev" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white transition hover:border-brand-400/40 hover:bg-brand-500/10" aria-label="Anterior">
+            <button type="button" id="officer-prev" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand-400/20 bg-brand-500/10 text-brand-300 transition hover:bg-brand-500/20" aria-label="Anterior">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m15 6-6 6 6 6"/></svg>
             </button>
-            <button type="button" id="officer-next" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white transition hover:border-brand-400/40 hover:bg-brand-500/10" aria-label="Siguiente">
+            <button type="button" id="officer-next" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand-400/20 bg-brand-500/10 text-brand-300 transition hover:bg-brand-500/20" aria-label="Siguiente">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m9 6 6 6-6 6"/></svg>
             </button>
           </div>

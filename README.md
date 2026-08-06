@@ -2,7 +2,7 @@
 
 Plataforma web profesional para la gestión integral del **San Andreas Emergency Department (SAED)** en un servidor FiveM Roleplay.
 
-El sistema centraliza autenticación (Discord OAuth2 y local), personajes, RBAC, personal médico, departamentos, informes médicos, denuncias ciudadanas, academia, noticias/CMS de landing y panel administrativo.
+El sistema centraliza autenticación local (usuario y contraseña), personajes, RBAC, personal médico, departamentos, informes médicos, academia, noticias/CMS de landing y panel administrativo.
 
 ---
 
@@ -10,7 +10,7 @@ El sistema centraliza autenticación (Discord OAuth2 y local), personajes, RBAC,
 
 | Capa | Stack |
 |------|--------|
-| Backend | NestJS, Prisma, PostgreSQL, JWT, Passport (Discord OAuth2), Socket.IO, Multer |
+| Backend | NestJS, Prisma, PostgreSQL, JWT, Passport (JWT), Socket.IO, Multer |
 | Frontend | HTML5, Tailwind CSS, Flowbite, JavaScript ES Modules, Vite, Axios, Socket.IO Client |
 | Infra | Docker Compose (PostgreSQL 16) |
 
@@ -57,10 +57,13 @@ saed-system/
 
 - **Personal médico** — fichas institucionales, rangos y asignación a departamentos
 - **Departamentos** — unidades médicas / especialidades del SAED
+- **Pacientes / EMR** — fichas clínicas, tratamientos y facturación
 - **Informes médicos** — registro y seguimiento de atención
-- **Expedientes / casos** — historial clínico e institucional asociado al personaje
+- **Citas y turnos** — agenda clínica y duty clock
+- **Quejas y solicitudes** — High Command (Subdirector Médico y superiores)
+- **LSPD** — interoperabilidad institucional (aptitud, expedientes temporales, facturación)
 - **Academia** — formación y progresión del personal
-- **Denuncias** — canal ciudadano (complaints) con seguimiento en tiempo real
+- **Convenios e incentivos** — relaciones institucionales y pagos
 - **Noticias / CMS** — contenidos públicos de la landing
 - **Notificaciones, premios, auditoría y settings** — soporte institucional
 
@@ -178,8 +181,10 @@ npx prisma studio            # UI opcional
 |--------|-------------|
 | `npm run start:dev` | Nest en modo watch |
 | `npm run build` | Compilación producción |
-| `npm run start:prod` | Ejecuta `dist/main` |
-| `npm run start:railway` | `prisma migrate deploy` + producción |
+| `npm run start:prod` | `node server.cjs` (mismo entry que Railway) |
+| `npm run start:railway` | Entry de producción Railway (`node server.cjs`) |
+| `npm run prisma:migrate:deploy` | Aplica migraciones pendientes |
+| `npm run prisma:release` | `migrate deploy` + seed |
 | `npm run prisma:generate` | Genera Prisma Client |
 | `npm run prisma:migrate` | `prisma migrate dev` |
 | `npm run prisma:seed` | Semilla inicial |
@@ -192,6 +197,7 @@ npx prisma studio            # UI opcional
 | `npm run dev` | Vite dev server |
 | `npm run build` | Build estático |
 | `npm run preview` | Preview del build |
+| `npm run start:railway` | Sirve `dist/` en Railway (`serve`) |
 | `npm run lint` | ESLint |
 
 ---

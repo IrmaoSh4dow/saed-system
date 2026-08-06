@@ -10,7 +10,7 @@ import {
 import { listDepartments } from '../../services/departments.service.js';
 import { listRanks } from '../../services/ranks.service.js';
 import { can } from '../../services/auth-context.js';
-import { PERMISSIONS } from '../../utils/permissions.js';
+import { MEDICAL_ROLE_OPTIONS, PERMISSIONS } from '../../utils/permissions.js';
 import { mountAdminPage, renderAdminShell, requireAdminAccess } from './admin-shell.js';
 import { adminOfficerDetailPage } from './admin-staff-detail.page.js';
 
@@ -35,7 +35,7 @@ export function adminOfficersPage() {
       ${
         canCreate
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Incorporar a personal médico</h3>
           <p class="mt-1 text-xs text-ink-400">Preferible desde <a data-link href="/admin/characters" class="text-brand-300 hover:text-brand-200">Personajes</a>. Organización pasa a SAED automáticamente.</p>
           <div class="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -71,12 +71,9 @@ export function adminOfficersPage() {
               <div class="sm:col-span-2">
                 <label class="form-label" for="promote-role">Role RBAC (permisos)</label>
                 <select id="promote-role" class="form-input">
-                  <option value="officer">Officer</option>
-                  <option value="sergeant">Sergeant</option>
-                  <option value="lieutenant">Lieutenant</option>
-                  <option value="captain">Captain</option>
-                  <option value="commander">Commander</option>
-                  <option value="chief">Chief</option>
+                  ${MEDICAL_ROLE_OPTIONS.map(
+                    (item) => `<option value="${item.value}">${item.label}</option>`,
+                  ).join('')}
                   ${
                     can(PERMISSIONS.ROLES_ASSIGN) || can(PERMISSIONS.ACCOUNTS_MANAGE)
                       ? '<option value="administrator">Administrator</option>'
@@ -93,7 +90,7 @@ export function adminOfficersPage() {
           : ''
       }
 
-      <section class="surface-card overflow-hidden">
+      <section class="panel overflow-hidden">
         <div class="border-b border-white/10 px-5 py-4">
           <h3 class="text-sm font-semibold text-white">Directorio de personal médico</h3>
         </div>
@@ -242,7 +239,7 @@ export function adminOfficersPage() {
             rankId: root.querySelector('#promote-rank').value,
             departmentId: root.querySelector('#promote-department').value || undefined,
             callsign: root.querySelector('#promote-callsign').value.trim() || undefined,
-            roleSlug: root.querySelector('#promote-role')?.value || 'officer',
+            roleSlug: root.querySelector('#promote-role')?.value || 'doctor',
             joinedAt: root.querySelector('#promote-joined')?.value || undefined,
           });
           setAuthAlert(root, {

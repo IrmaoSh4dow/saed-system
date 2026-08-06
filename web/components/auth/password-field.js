@@ -7,16 +7,17 @@ export function renderPasswordField({
   placeholder = '••••••••',
   autocomplete = 'current-password',
   required = true,
+  hint = '',
 } = {}) {
   return `
-    <div>
+    <div class="auth-field">
       <label class="form-label" for="${id}">${label}</label>
       <div class="relative">
         <input
           id="${id}"
           name="${name}"
           type="password"
-          class="form-input pr-12"
+          class="form-input auth-input pr-12"
           placeholder="${placeholder}"
           autocomplete="${autocomplete}"
           ${required ? 'required' : ''}
@@ -24,14 +25,16 @@ export function renderPasswordField({
         <button
           type="button"
           id="${id}-toggle"
-          class="absolute inset-y-0 right-0 flex items-center px-3 text-ink-400 transition hover:text-white"
+          class="auth-password-toggle"
           aria-label="Mostrar contraseña"
+          aria-controls="${id}"
           data-password-toggle="${id}"
         >
           ${icon('eye', 'h-4 w-4')}
         </button>
       </div>
-      <p id="${id}-error" class="form-error hidden"></p>
+      ${hint ? `<p class="form-hint">${hint}</p>` : ''}
+      <p id="${id}-error" class="form-error hidden" role="alert"></p>
     </div>
   `;
 }
@@ -51,6 +54,7 @@ export function initPasswordToggles(root = document) {
       input.type = isHidden ? 'text' : 'password';
       button.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
       button.innerHTML = icon(isHidden ? 'eyeOff' : 'eye', 'h-4 w-4');
+      button.classList.toggle('is-active', isHidden);
     };
 
     button.addEventListener('click', onClick);

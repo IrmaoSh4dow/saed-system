@@ -25,7 +25,7 @@ export function adminRanksPage() {
       ${
         canCreate
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Crear rango</h3>
           <form id="create-rank-form" class="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
@@ -46,7 +46,7 @@ export function adminRanksPage() {
       `
           : ''
       }
-      <section class="surface-card overflow-hidden">
+      <section class="panel overflow-hidden">
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-sm">
             <thead class="bg-white/[0.02] text-xs uppercase tracking-wide text-ink-500">

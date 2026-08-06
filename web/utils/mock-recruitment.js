@@ -1,16 +1,18 @@
 export const mockRecruitment = [
   {
     id: 'r-1',
-    title: 'Reclutamiento Emergency Response',
+    title: 'Ingreso Academia Médica',
     status: 'Abierta',
     closesAt: 'Cierra el 20 ago 2026',
-    summary: 'Buscamos aspirantes comprometidos con el servicio y la atención médica de emergencia.',
+    summary:
+      'Convocatoria para aspirantes a la Academia Médica del SAED. Formación estructurada y seguimiento digital desde el primer día.',
   },
   {
     id: 'r-2',
-    title: 'Proceso interno Trauma Unit',
+    title: 'Especialización Trauma',
     status: 'Abierta',
     closesAt: 'Cierra el 28 ago 2026',
-    summary: 'Plazas limitadas para personal médico con experiencia en trauma y documentación clínica.',
+    summary:
+      'Proceso interno para personal con experiencia clínica en trauma, estabilización y documentación de urgencias.',
   },
 ];

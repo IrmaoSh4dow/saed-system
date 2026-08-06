@@ -1,4 +1,9 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
+import { renderReportCard } from '../components/reports/report-card.js';
+import { renderDashTabs } from '../components/ui/dash-tabs.js';
+import { renderEmptyState } from '../components/ui/empty-state.js';
+import { renderPageHeader } from '../components/ui/page-header.js';
+import { renderSummaryStrip } from '../components/ui/summary-strip.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { can } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
@@ -7,29 +12,6 @@ import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.j
 import { formatDateLabel, formatDateShort } from '../utils/date.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 import { reportDetailPage } from './report-detail.page.js';
-
-const STATUS_LABELS = {
-  PENDING: 'Pendiente',
-  IN_PROGRESS: 'En progreso',
-  UNDER_REVIEW: 'En revisión',
-  COMPLETED: 'Finalizado',
-  ARCHIVED: 'Archivado',
-};
-
-const PRIORITY_LABELS = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  CRITICAL: 'Crítica',
-};
-
-const TYPE_LABELS = {
-  INCIDENT: 'Incidente',
-  INVESTIGATION: 'Investigación',
-  INTERNAL: 'Interno',
-  ACTIVITY: 'Actividad',
-  OTHER: 'Otro',
-};
 
 /**
  * @param {{ scope?: 'mine' | 'department' | 'all', title?: string, eyebrow?: string }} [options]
@@ -60,73 +42,49 @@ export function reportsPage(options = {}) {
         ? 'Todos los informes'
         : 'Informes');
 
+  const description =
+    scope === 'department'
+      ? 'Casos e informes bajo la responsabilidad de tu departamento activo.'
+      : scope === 'all'
+        ? 'Visión global de informes clínicos e internos del SAED.'
+        : 'Tu cartera operativa de informes, investigaciones y seguimiento.';
+
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'reports-alert' })}
-      <section class="surface-card flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-        <div class="min-w-0">
-          <p class="landing-eyebrow">${options.eyebrow ?? 'Operaciones'}</p>
-          <h2 class="mt-1 text-2xl font-semibold text-white">${title}</h2>
-          <p class="mt-2 text-sm text-ink-300">
-            ${
-              scope === 'department'
-                ? 'Informes cuyo departamento responsable es el tuyo.'
-                : 'Gestión de investigaciones y reportes internos del departamento.'
-            }
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          ${
-            canCreate
-              ? `<a data-link href="/reports/new" class="btn-primary shrink-0">Nuevo informe</a>`
-              : ''
-          }
-        </div>
-      </section>
+      ${renderPageHeader({
+        eyebrow: options.eyebrow ?? 'Operaciones clínicas',
+        title,
+        description,
+        actionsHtml: canCreate
+          ? `<a data-link href="/reports/new" class="btn-primary !py-2.5">Nuevo informe</a>`
+          : '',
+      })}
 
-      <nav class="flex flex-wrap gap-2">
-        <a data-link href="/reports" class="rounded-xl px-3.5 py-2 text-sm font-medium transition ${
-          scope === 'mine'
-            ? 'bg-brand-500/15 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
-            : 'border border-white/10 text-ink-300 hover:bg-white/[0.04] hover:text-white'
-        }">Mis informes</a>
-        <a data-link href="/reports/department" class="rounded-xl px-3.5 py-2 text-sm font-medium transition ${
-          scope === 'department'
-            ? 'bg-brand-500/15 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
-            : 'border border-white/10 text-ink-300 hover:bg-white/[0.04] hover:text-white'
-        }">Mi departamento</a>
-        ${
-          canSeeAll
-            ? `<a data-link href="/reports/all" class="rounded-xl px-3.5 py-2 text-sm font-medium transition ${
-                scope === 'all'
-                  ? 'bg-brand-500/15 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
-                  : 'border border-white/10 text-ink-300 hover:bg-white/[0.04] hover:text-white'
-              }">Todos</a>`
-            : ''
-        }
-      </nav>
+      <div id="reports-summary">
+        ${renderSummaryStrip([
+          { label: 'Total', value: '—' },
+          { label: 'Abiertos', value: '—', tone: 'warning' },
+          { label: 'Críticos', value: '—', tone: 'danger' },
+          { label: 'Finalizados', value: '—', tone: 'brand' },
+        ])}
+      </div>
 
-      <section class="surface-card overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-left text-sm">
-            <thead class="bg-white/[0.02] text-xs uppercase tracking-wide text-ink-500">
-              <tr>
-                <th class="px-5 py-3">Nº</th>
-                <th class="px-5 py-3">Título</th>
-                <th class="px-5 py-3">Tipo</th>
-                <th class="px-5 py-3">Encargado</th>
-                <th class="px-5 py-3">Departamento</th>
-                <th class="px-5 py-3">Estado</th>
-                <th class="px-5 py-3">Prioridad</th>
-                <th class="px-5 py-3">Fecha</th>
-                <th class="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody id="reports-table-body" class="divide-y divide-white/5">
-              <tr><td colspan="9" class="px-5 py-8 text-center text-ink-400">Cargando...</td></tr>
-            </tbody>
-          </table>
-        </div>
+      ${renderDashTabs([
+        { id: 'mine', href: '/reports', label: 'Mis informes', active: scope === 'mine' },
+        {
+          id: 'department',
+          href: '/reports/department',
+          label: 'Mi departamento',
+          active: scope === 'department',
+        },
+        ...(canSeeAll
+          ? [{ id: 'all', href: '/reports/all', label: 'Todos', active: scope === 'all' }]
+          : []),
+      ])}
+
+      <section id="reports-feed" class="record-feed">
+        <p class="text-sm text-ink-400">Cargando informes...</p>
       </section>
     </div>
   `;
@@ -142,33 +100,39 @@ export function reportsPage(options = {}) {
 
       void listReports(scope)
         .then((items) => {
-          const body = root.querySelector('#reports-table-body');
-          if (!body) return;
           const list = Array.isArray(items) ? items : [];
-          body.innerHTML = list.length
+          const open = list.filter((item) =>
+            ['PENDING', 'IN_PROGRESS', 'UNDER_REVIEW'].includes(item.status),
+          ).length;
+          const critical = list.filter((item) => item.priority === 'CRITICAL').length;
+          const completed = list.filter((item) => item.status === 'COMPLETED').length;
+
+          const summary = root.querySelector('#reports-summary');
+          if (summary) {
+            summary.innerHTML = renderSummaryStrip([
+              { label: 'Total', value: String(list.length) },
+              { label: 'Abiertos', value: String(open), tone: 'warning' },
+              { label: 'Críticos', value: String(critical), tone: 'danger' },
+              { label: 'Finalizados', value: String(completed), tone: 'brand' },
+            ]);
+          }
+
+          const feed = root.querySelector('#reports-feed');
+          if (!feed) return;
+          feed.innerHTML = list.length
             ? list
-                .map((item) => {
-                  const lead = item.leadStaff
-                    ? `${item.leadStaff.character.firstName} ${item.leadStaff.character.lastName}`
-                    : '—';
-                  return `
-                    <tr class="hover:bg-white/[0.02]">
-                      <td class="px-5 py-3 font-medium text-white">#${item.reportNumber}</td>
-                      <td class="px-5 py-3 text-ink-200 max-w-[14rem] truncate">${escapeHtml(item.title)}</td>
-                      <td class="px-5 py-3 text-ink-300">${TYPE_LABELS[item.type] ?? item.type}</td>
-                      <td class="px-5 py-3 text-ink-300">${escapeHtml(lead)}</td>
-                      <td class="px-5 py-3 text-ink-300">${escapeHtml(item.department?.name ?? '—')}</td>
-                      <td class="px-5 py-3 text-ink-300">${STATUS_LABELS[item.status] ?? item.status}</td>
-                      <td class="px-5 py-3 text-ink-300">${PRIORITY_LABELS[item.priority] ?? item.priority}</td>
-                      <td class="px-5 py-3 text-ink-400">${formatDateShort(item.createdAt) || formatDateLabel(item.incidentDate)}</td>
-                      <td class="px-5 py-3 text-right">
-                        <a data-link href="/reports?id=${item.id}" class="text-xs font-medium text-brand-300 hover:text-brand-200">Ver</a>
-                      </td>
-                    </tr>
-                  `;
-                })
+                .map((item) =>
+                  renderReportCard(item, {
+                    dateLabel:
+                      formatDateShort(item.createdAt) || formatDateLabel(item.incidentDate) || '—',
+                  }),
+                )
                 .join('')
-            : `<tr><td colspan="9" class="px-5 py-8 text-center text-ink-400">No hay informes en esta vista.</td></tr>`;
+            : renderEmptyState({
+                title: 'Sin informes en esta vista',
+                description: 'Cuando se creen o te asignen informes, aparecerán aquí.',
+                iconName: 'file',
+              });
         })
         .catch((error) => {
           setAuthAlert(root, {
@@ -197,12 +161,4 @@ export function allReportsPage() {
     title: 'Todos los informes',
     eyebrow: 'Comando',
   });
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
 }

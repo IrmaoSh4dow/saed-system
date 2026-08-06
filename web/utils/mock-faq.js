@@ -1,32 +1,32 @@
 export const mockFaq = [
   {
     id: 'faq-1',
-    question: '¿Necesito Discord para usar el sistema?',
+    question: '¿Cómo inicio sesión?',
     answer:
-      'Puedes iniciar sesión con Discord OAuth2 o con usuario/correo y contraseña. Ambos métodos están vinculados a la misma cuenta.',
+      'Únicamente con usuario y contraseña. No existen otros métodos de autenticación externos.',
   },
   {
     id: 'faq-2',
     question: '¿Puedo tener varios personajes?',
     answer:
-      'Sí. Una cuenta puede registrar múltiples personajes y cambiar entre ellos sin cerrar sesión. Los permisos dependen del personaje activo.',
+      'Sí. Una cuenta puede registrar hasta dos personajes y cambiar entre ellos sin cerrar sesión. Los permisos dependen del personaje activo.',
   },
   {
     id: 'faq-3',
     question: '¿Los civiles pueden utilizar la plataforma?',
     answer:
-      'Sí. Los personajes civiles pueden consultar información pública, presentar denuncias y hacer seguimiento de sus casos abiertos.',
+      'Sí. Los personajes civiles pueden consultar noticias públicas y la información médica asociada a su personaje.',
   },
   {
     id: 'faq-4',
-    question: '¿Cómo presento una denuncia?',
+    question: '¿Cómo accede el personal médico?',
     answer:
-      'Desde la sección de denuncias podrás registrar un aviso, adjuntar evidencias y comunicarte en tiempo real con el personal asignado. El módulo estará disponible próximamente.',
+      'Tras autenticarte, selecciona un personaje perteneciente al SAED. El sistema habilitará módulos según tus roles y permisos.',
   },
   {
     id: 'faq-5',
-    question: '¿Quién puede ver mi información?',
+    question: '¿Quién puede ver mi información médica?',
     answer:
-      'El acceso está controlado por roles y permisos. Solo el personal autorizado puede consultar información institucional o datos sensibles de una investigación.',
+      'El acceso está controlado por roles y permisos. Solo el personal sanitario autorizado puede consultar expedientes e informes clínicos.',
   },
 ];

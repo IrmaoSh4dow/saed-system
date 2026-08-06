@@ -1,9 +1,10 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
-import { icon } from '../components/landing/icons.js';
-import { renderStaffDecorationsGrid } from '../components/staff/officer-decorations-grid.js';
-import { renderStaffLicensesGrid } from '../components/staff/officer-licenses-grid.js';
-import { renderStaffDepartmentPanel } from '../components/staff/officer-department-panel.js';
-import { renderStaffDepartmentsSection } from '../components/staff/officer-departments-section.js';
+import { renderStaffDecorationsGrid } from '../components/staff/staff-decorations-grid.js';
+import { renderStaffLicensesGrid } from '../components/staff/staff-licenses-grid.js';
+import { renderStaffDepartmentPanel } from '../components/staff/staff-department-panel.js';
+import { renderStaffDepartmentsSection } from '../components/staff/staff-departments-section.js';
+import { renderPageHeader } from '../components/ui/page-header.js';
+import { renderStatTile } from '../components/ui/stat-tile.js';
 import { resolveStaffDepartments } from '../utils/staff-departments.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { setIdentityActiveCharacter, setIdentityCharacters } from '../services/auth-state.store.js';
@@ -11,6 +12,7 @@ import { getAuthState } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import { listCharacters, uploadCharacterAvatar } from '../services/characters.service.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
+import { isSaedMember } from '../utils/character.js';
 import { validateImageUploadFile } from '../utils/image-upload.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
@@ -24,14 +26,19 @@ export function profilePage() {
   }
 
   const { user, activeCharacter, roles } = getAuthState();
+  const isSaed = isSaedMember(activeCharacter);
   const statusLabel = formatStatus(activeCharacter.status);
   const joinedAt = formatDate(activeCharacter.joinedAt || activeCharacter.createdAt);
   const initials =
     `${activeCharacter.firstName?.[0] ?? ''}${activeCharacter.lastName?.[0] ?? ''}`.toUpperCase();
   const occupation = activeCharacter.primaryOccupation;
   const officer = activeCharacter.staffProfile;
-  const organization = occupation?.organization ?? (officer ? 'SAED' : '—');
-  const position = occupation?.position ?? officer?.rankLabel ?? activeCharacter.rank ?? '—';
+  const organization = isSaed
+    ? 'SAED'
+    : occupation?.organization ?? null;
+  const position = isSaed
+    ? officer?.rankLabel ?? activeCharacter.rank ?? null
+    : occupation?.position ?? null;
   const decorations = officer?.decorations ?? [];
   const licenses = officer?.licenses ?? [];
   const departmentView = officer ? resolveStaffDepartments(officer) : null;
@@ -39,10 +46,20 @@ export function profilePage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'profile-alert' })}
-      <section class="surface-card overflow-hidden p-6 md:p-8">
-        <div class="flex flex-col gap-6 sm:flex-row sm:items-start">
+      ${renderPageHeader({
+        eyebrow: isSaed ? 'Identidad activa' : 'Perfil civil',
+        title: `${escapeHtml(activeCharacter.firstName)} ${escapeHtml(activeCharacter.lastName)}`,
+        description: isSaed
+          ? `Cuenta @${escapeHtml(user?.username ?? '—')} · ${escapeHtml(statusLabel)} · SAED`
+          : `Cuenta @${escapeHtml(user?.username ?? '—')} · Ciudadano`,
+        actionsHtml: `<a data-link href="/characters/select" class="btn-secondary !py-2.5">Cambiar identidad</a>`,
+      })}
+
+      <section class="panel relative overflow-hidden">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(217,30,30,0.12),_transparent_45%)]"></div>
+        <div class="relative flex flex-col gap-6 p-6 sm:flex-row sm:items-start md:p-8">
           <div class="space-y-3">
-            <div id="profile-avatar" class="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-brand-500/30 bg-brand-500/10 text-xl font-semibold text-brand-200">
+            <div id="profile-avatar" class="h-28 w-24 shrink-0 overflow-hidden rounded-2xl border border-brand-400/30 bg-brand-500/10 text-xl font-semibold text-brand-200 shadow-[0_20px_50px_rgba(217,30,30,0.15)] sm:h-32 sm:w-28">
               ${
                 activeCharacter.avatarUrl
                   ? `<img src="${escapeHtml(activeCharacter.avatarUrl)}" alt="" class="h-full w-full object-cover" />`
@@ -61,34 +78,101 @@ export function profilePage() {
             </div>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="landing-eyebrow">Perfil</p>
-            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">
-              ${escapeHtml(activeCharacter.firstName)} ${escapeHtml(activeCharacter.lastName)}
-            </h2>
-            <p class="mt-2 text-sm text-ink-300">
-              Cuenta: <span class="text-white">${escapeHtml(user?.displayName ?? user?.username ?? '—')}</span>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-400">
+              ${isSaed ? 'Ficha institucional' : 'Identidad civil'}
             </p>
-            <p class="mt-2 text-sm text-brand-300">${escapeHtml(statusLabel)} · ${escapeHtml(organization)}</p>
+            <h3 class="mt-2 text-xl font-semibold text-white sm:text-2xl">
+              ${escapeHtml(isSaed ? position ?? statusLabel : organization ?? 'Ciudadano')}
+            </h3>
+            <p class="mt-2 text-sm text-ink-300">
+              ${
+                isSaed
+                  ? `Nº ${escapeHtml(officer?.employeeNumber ?? '—')} · Ingreso ${escapeHtml(joinedAt)}`
+                  : `Ciudadano · Registrado ${escapeHtml(joinedAt)}`
+              }
+            </p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <span class="status-pill status-pill-success">${escapeHtml(statusLabel)}</span>
+              ${
+                organization
+                  ? `<span class="status-pill">${escapeHtml(organization)}</span>`
+                  : ''
+              }
+              ${
+                isSaed && officer?.callsign
+                  ? `<span class="status-pill">Indicativo ${escapeHtml(officer.callsign)}</span>`
+                  : ''
+              }
+            </div>
           </div>
-          ${renderStaffDepartmentPanel({
-            name: departmentView?.primaryName ?? officer?.departmentName,
-            imageUrl: departmentView?.primaryImageUrl ?? officer?.departmentImageUrl,
-            role: departmentView?.primaryRole,
-          })}
+          ${
+            isSaed
+              ? renderStaffDepartmentPanel({
+                  name: departmentView?.primaryName ?? officer?.departmentName,
+                  imageUrl: departmentView?.primaryImageUrl ?? officer?.departmentImageUrl,
+                  role: departmentView?.primaryRole,
+                })
+              : ''
+          }
         </div>
       </section>
 
-      <section class="grid gap-4 sm:grid-cols-2 ${officer ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}">
-        ${profileStat('Estado', statusLabel, 'check')}
-        ${profileStat('Organización', organization, 'users')}
-        ${profileStat(officer ? 'Rango' : 'Cargo', position, 'shield')}
-        ${officer ? profileStat('Nº empleado', officer.employeeNumber, 'file') : ''}
+      <section class="grid gap-4 sm:grid-cols-2 ${isSaed ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}">
+        ${renderStatTile({ label: 'Estado', value: statusLabel, hint: 'Situación actual', iconName: 'check' })}
+        ${
+          organization
+            ? renderStatTile({
+                label: isSaed ? 'Organización' : 'Empleo',
+                value: organization,
+                hint: isSaed ? 'Afiliación SAED' : 'Actividad civil',
+                iconName: 'users',
+              })
+            : renderStatTile({
+                label: 'Tipo',
+                value: 'Civil',
+                hint: 'Sin afiliación SAED',
+                iconName: 'users',
+              })
+        }
+        ${
+          isSaed
+            ? renderStatTile({
+                label: 'Rango',
+                value: position ?? '—',
+                hint: 'Jerarquía médica',
+                iconName: 'shield',
+              })
+            : position
+              ? renderStatTile({
+                  label: 'Cargo',
+                  value: position,
+                  hint: 'Empleo civil',
+                  iconName: 'shield',
+                })
+              : renderStatTile({
+                  label: 'Cuenta',
+                  value: `@${user?.username ?? '—'}`,
+                  hint: 'Usuario de acceso',
+                  iconName: 'lock',
+                })
+        }
+        ${
+          isSaed && officer
+            ? renderStatTile({
+                label: 'Nº empleado',
+                value: officer.employeeNumber,
+                hint: 'Identificador SAED',
+                iconName: 'file',
+                tone: 'brand',
+              })
+            : ''
+        }
       </section>
 
-      ${officer ? renderStaffDepartmentsSection(officer, { showBadge: false }) : ''}
+      ${isSaed && officer ? renderStaffDepartmentsSection(officer, { showBadge: false }) : ''}
 
       <section class="grid gap-4 lg:grid-cols-2">
-        <article class="surface-card p-6">
+        <article class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Datos del personaje</h3>
           <dl class="mt-4 space-y-3 text-sm">
             ${detailRow('Nombre', activeCharacter.firstName)}
@@ -96,42 +180,51 @@ export function profilePage() {
             ${detailRow('Fecha de nacimiento', formatDate(activeCharacter.birthDate))}
             ${detailRow('Nacionalidad', activeCharacter.nationality ?? '—')}
             ${detailRow('Sexo', formatSex(activeCharacter.sex))}
+            ${detailRow('Teléfono', activeCharacter.phone ?? '—')}
             ${detailRow('Estado', statusLabel)}
-            ${detailRow('Organización', organization)}
-            ${detailRow(officer ? 'Rango' : 'Cargo', position)}
-            ${officer ? detailRow('Nº empleado', officer.employeeNumber) : ''}
-            ${officer ? detailRow('Departamento principal', departmentView?.primaryName ?? 'Sin asignar') : ''}
-            ${detailRow('Ingreso', joinedAt)}
-            ${detailRow('Roles RBAC', (roles?.length ? roles : (activeCharacter.roles ?? [])).join(', ') || 'citizen')}
+            ${detailRow('Registrado', joinedAt)}
+            ${detailRow('Roles', (roles?.length ? roles : (activeCharacter.roles ?? [])).join(', ') || 'citizen')}
           </dl>
         </article>
 
-        <article class="surface-card p-6">
+        <article class="panel p-6">
           <h3 class="text-sm font-semibold text-white">
-            ${officer ? 'Servicio SAED' : 'Empleo civil'}
+            ${isSaed ? 'Servicio SAED' : 'Información civil'}
           </h3>
           <p class="mt-1 text-xs text-ink-400">
             ${
-              officer
-                ? 'La organización SAED se asigna automáticamente al promover al personaje.'
-                : 'El empleo se elige al crear el personaje. SAED no puede seleccionarse manualmente.'
+              isSaed
+                ? 'Datos institucionales del personal médico activo.'
+                : 'Solo se muestra información relevante para un ciudadano. Los datos SAED no aplican.'
             }
           </p>
           <dl class="mt-5 space-y-3 text-sm">
-            ${detailRow('Organización', organization)}
-            ${detailRow(officer ? 'Rango' : 'Cargo', position)}
-            ${officer ? detailRow('Departamento', officer.departmentName ?? 'Sin asignar') : ''}
-            ${officer ? detailRow('Indicativo', officer.callsign ?? '—') : ''}
-            ${officer ? detailRow('Estado del personal', formatStaffStatus(officer.status)) : ''}
-            ${!officer ? detailRow('Tipo', formatOccupationType(occupation?.type)) : ''}
+            ${
+              isSaed
+                ? `
+                  ${detailRow('Organización', 'SAED')}
+                  ${detailRow('Rango', position ?? '—')}
+                  ${detailRow('Nº empleado', officer?.employeeNumber ?? '—')}
+                  ${detailRow('Departamento principal', departmentView?.primaryName ?? 'Sin asignar')}
+                  ${detailRow('Indicativo', officer?.callsign ?? '—')}
+                  ${detailRow('Estado del personal', formatStaffStatus(officer?.status))}
+                `
+                : `
+                  ${detailRow('Tipo de perfil', 'Ciudadano')}
+                  ${organization ? detailRow('Empleo / organización', organization) : ''}
+                  ${position ? detailRow('Cargo', position) : ''}
+                  ${occupation ? detailRow('Tipo de empleo', formatOccupationType(occupation?.type)) : ''}
+                  ${detailRow('Acceso portal', 'Citas, quejas y academia')}
+                `
+            }
           </dl>
         </article>
       </section>
 
       ${
-        officer
+        isSaed && officer
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Condecoraciones</h3>
           <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             ${renderStaffDecorationsGrid(decorations, {
@@ -139,7 +232,7 @@ export function profilePage() {
             })}
           </div>
         </section>
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Licencias</h3>
           <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             ${renderStaffLicensesGrid(licenses, {
@@ -211,22 +304,6 @@ export function profilePage() {
       };
     },
   };
-}
-
-function profileStat(label, value, iconName) {
-  return `
-    <article class="surface-card p-5">
-      <div class="flex items-center gap-3">
-        <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-ink-300">
-          ${icon(iconName, 'h-4 w-4')}
-        </span>
-        <div class="min-w-0">
-          <p class="text-[11px] uppercase tracking-[0.16em] text-ink-500">${label}</p>
-          <p class="mt-0.5 truncate text-sm font-semibold text-white">${escapeHtml(value)}</p>
-        </div>
-      </div>
-    </article>
-  `;
 }
 
 function detailRow(label, value) {

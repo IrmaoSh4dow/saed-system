@@ -1,5 +1,9 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
 import { renderOfficerCard } from '../components/staff/staff-card.js';
+import { renderEmptyState } from '../components/ui/empty-state.js';
+import { renderFilterShell } from '../components/ui/filter-shell.js';
+import { renderPageHeader } from '../components/ui/page-header.js';
+import { renderSummaryStrip } from '../components/ui/summary-strip.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import { listOfficers } from '../services/staff.service.js';
@@ -24,65 +28,70 @@ export function officersPage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'officers-alert' })}
+      ${renderPageHeader({
+        eyebrow: 'Institución',
+        title: 'Personal médico',
+        description: 'Directorio operativo del SAED. Explora fichas, rangos y departamentos.',
+      })}
 
-      <section class="surface-card p-5 md:p-6">
-        <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p class="landing-eyebrow">Personal</p>
-            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Personal médico</h2>
-            <p class="mt-2 max-w-2xl text-sm text-ink-300">
-              Directorio del departamento. Consulta el personal activo y su ficha operativa.
-            </p>
-          </div>
-          <p id="officers-count" class="text-sm text-ink-400">—</p>
-        </div>
+      <div id="officers-summary">
+        ${renderSummaryStrip([
+          { label: 'Personal', value: '—' },
+          { label: 'Activos', value: '—', tone: 'brand' },
+          { label: 'Departamentos', value: '—' },
+          { label: 'Visibles', value: '—', tone: 'warning' },
+        ])}
+      </div>
 
-        <form id="officers-filters" class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          <div class="sm:col-span-2 xl:col-span-2">
-            <label class="form-label" for="officers-search">Buscar</label>
-            <input
-              id="officers-search"
-              name="search"
-              class="form-input"
-              placeholder="Nombre o badge..."
-              autocomplete="off"
-            />
-          </div>
-          <div>
-            <label class="form-label" for="officers-department">Departamento</label>
-            <select id="officers-department" name="department" class="form-input">
-              <option value="">Todas</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="officers-rank">Rango</label>
-            <select id="officers-rank" name="rank" class="form-input">
-              <option value="">Todos</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="officers-status">Estado</label>
-            <select id="officers-status" name="status" class="form-input">
-              <option value="">Todos</option>
-              <option value="ACTIVE">Activo</option>
-              <option value="INACTIVE">Inactivo</option>
-              <option value="SUSPENDED">Suspendido</option>
-              <option value="RETIRED">Retirado</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="officers-sort">Ordenar</label>
-            <select id="officers-sort" name="sort" class="form-input">
-              <option value="name">Nombre</option>
-              <option value="rank">Rango</option>
-              <option value="badge">Badge</option>
-            </select>
-          </div>
-        </form>
-      </section>
+      ${renderFilterShell({
+        bodyHtml: `
+          <form id="officers-filters" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div class="sm:col-span-2 xl:col-span-2">
+              <label class="form-label" for="officers-search">Buscar</label>
+              <input
+                id="officers-search"
+                name="search"
+                class="form-input"
+                placeholder="Nombre o nº de empleado..."
+                autocomplete="off"
+              />
+            </div>
+            <div>
+              <label class="form-label" for="officers-department">Departamento</label>
+              <select id="officers-department" name="department" class="form-input">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="officers-rank">Rango</label>
+              <select id="officers-rank" name="rank" class="form-input">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="officers-status">Estado</label>
+              <select id="officers-status" name="status" class="form-input">
+                <option value="">Todos</option>
+                <option value="ACTIVE">Activo</option>
+                <option value="INACTIVE">Inactivo</option>
+                <option value="SUSPENDED">Suspendido</option>
+                <option value="RETIRED">Retirado</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="officers-sort">Ordenar</label>
+              <select id="officers-sort" name="sort" class="form-input">
+                <option value="name">Nombre</option>
+                <option value="rank">Rango</option>
+                <option value="badge">Nº empleado</option>
+              </select>
+            </div>
+          </form>
+        `,
+      })}
 
-      <section id="officers-grid" class="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <p class="text-sm text-ink-400 sm:col-span-2 xl:col-span-4">Cargando personal médico...</p>
+      <section id="officers-grid" class="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <p class="text-sm text-ink-400 sm:col-span-2 xl:col-span-3 2xl:col-span-4">Cargando personal médico...</p>
       </section>
     </div>
   `;
@@ -100,7 +109,7 @@ export function officersPage() {
 
       const form = root.querySelector('#officers-filters');
       const grid = root.querySelector('#officers-grid');
-      const countLabel = root.querySelector('#officers-count');
+      const summary = root.querySelector('#officers-summary');
 
       const applyFilters = () => {
         const search = (form?.search?.value ?? '').trim().toLowerCase();
@@ -147,8 +156,26 @@ export function officersPage() {
           return nameA.localeCompare(nameB, 'es');
         });
 
-        if (countLabel) {
-          countLabel.textContent = `${filtered.length} de ${officers.length} personal médico`;
+        const activeCount = officers.filter((item) => item.status === 'ACTIVE').length;
+        const departmentCount = uniqueBy(
+          officers.flatMap((item) => {
+            const fromMemberships = (item.departmentMemberships ?? [])
+              .filter((row) => row.isActive !== false && row.department)
+              .map((row) => ({ id: row.departmentId }));
+            if (fromMemberships.length) return fromMemberships;
+            if (item.departmentId) return [{ id: item.departmentId }];
+            return [];
+          }),
+          'id',
+        ).length;
+
+        if (summary) {
+          summary.innerHTML = renderSummaryStrip([
+            { label: 'Personal', value: String(officers.length) },
+            { label: 'Activos', value: String(activeCount), tone: 'brand' },
+            { label: 'Departamentos', value: String(departmentCount) },
+            { label: 'Visibles', value: String(filtered.length), tone: 'warning' },
+          ]);
         }
 
         if (!grid) {
@@ -157,7 +184,11 @@ export function officersPage() {
 
         grid.innerHTML = filtered.length
           ? filtered.map((officer) => renderOfficerCard(officer)).join('')
-          : `<p class="text-sm text-ink-400 sm:col-span-2 xl:col-span-4">No hay personal médico que coincida con los filtros.</p>`;
+          : renderEmptyState({
+              title: 'Sin coincidencias',
+              description: 'Ajusta los filtros para encontrar al personal médico.',
+              iconName: 'users',
+            }).replace('empty-state', 'empty-state sm:col-span-2 xl:col-span-3 2xl:col-span-4');
       };
 
       const fillFilterOptions = (items) => {
@@ -229,7 +260,11 @@ export function officersPage() {
             message: getApiErrorMessage(error),
           });
           if (grid) {
-            grid.innerHTML = `<p class="text-sm text-ink-400 sm:col-span-2 xl:col-span-4">No se pudo cargar el directorio.</p>`;
+            grid.innerHTML = renderEmptyState({
+              title: 'No se pudo cargar el directorio',
+              description: 'Inténtalo de nuevo en unos momentos.',
+              iconName: 'users',
+            }).replace('empty-state', 'empty-state sm:col-span-2 xl:col-span-3 2xl:col-span-4');
           }
         });
 

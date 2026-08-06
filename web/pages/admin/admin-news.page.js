@@ -34,7 +34,7 @@ export function adminNewsPage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'admin-news-alert' })}
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Nueva noticia</h3>
         <form id="create-news-form" class="mt-4 space-y-4">
           <div class="grid gap-4 sm:grid-cols-2">
@@ -194,7 +194,7 @@ export function adminNewsPage() {
 function renderNewsRow(item) {
   const image = resolveUploadUrl(item.coverImageUrl);
   return `
-    <article class="surface-card overflow-hidden sm:flex">
+    <article class="panel overflow-hidden sm:flex">
       <div class="h-36 w-full shrink-0 bg-surface-950 sm:h-auto sm:w-44">
         ${
           image

@@ -14,26 +14,33 @@ export function renderDepartmentCard(department) {
     <a
       data-link
       href="/departments?id=${department.id}"
-      class="department-card surface-card surface-card-hover group flex h-[22rem] flex-col overflow-hidden transition duration-200"
+      class="department-card panel panel-hover group relative flex h-[23rem] flex-col overflow-hidden"
     >
-      <div class="relative flex h-36 w-full shrink-0 items-center justify-center overflow-hidden bg-surface-950">
+      <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/40 to-transparent opacity-0 transition group-hover:opacity-100"></div>
+      <div class="relative flex h-36 w-full shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br from-brand-600/10 to-surface-950">
         ${
           image
-            ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(department.name)}" class="h-full w-full object-contain p-5 transition duration-200 group-hover:scale-[1.02]" />`
+            ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(department.name)}" class="h-full w-full object-contain p-5 transition duration-500 group-hover:scale-[1.04]" />`
             : `<div class="text-sm font-medium uppercase tracking-wide text-ink-500">Sin logo</div>`
         }
         ${
           hasOpening
-            ? `<span class="absolute right-3 top-3 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Convocatoria</span>`
+            ? `<span class="absolute right-3 top-3 rounded-full border border-brand-400/25 bg-brand-500/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-300">Convocatoria</span>`
             : ''
         }
       </div>
       <div class="flex min-h-0 flex-1 flex-col p-5">
         <h3 class="truncate text-lg font-semibold text-white">${escapeHtml(department.name)}</h3>
         <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-300">${escapeHtml(description)}</p>
-        <div class="mt-auto space-y-1 pt-4 text-sm text-ink-400">
-          <p>${members} miembro${members === 1 ? '' : 's'}</p>
-          <p>${supervisors} encargado${supervisors === 1 ? '' : 's'}</p>
+        <div class="mt-auto grid grid-cols-2 gap-2 pt-5">
+          <div class="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2">
+            <p class="text-[10px] uppercase tracking-[0.14em] text-ink-500">Miembros</p>
+            <p class="mt-1 text-sm font-semibold text-white">${members}</p>
+          </div>
+          <div class="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2">
+            <p class="text-[10px] uppercase tracking-[0.14em] text-ink-500">Encargados</p>
+            <p class="mt-1 text-sm font-semibold text-white">${supervisors}</p>
+          </div>
         </div>
       </div>
     </a>

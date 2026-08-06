@@ -6,17 +6,13 @@ import {
 } from '@nestjs/common';
 import { CharacterStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import {
-  CIVILIAN_WORKPLACES,
-  findCivilianWorkplace,
-  isSaedOrganization,
-  SAED_ORGANIZATION,
-} from '../../common/constants/workplaces';
+import { isSaedOrganization, SAED_ORGANIZATION } from '../../common/constants/workplaces';
 import { excludeSystemAdministratorCharacter } from '../../common/constants/staff-filters';
 import { PrismaService } from '../../database/prisma.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { RolesService } from '../roles/roles.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
+import { EstablishmentsService } from '../establishments/establishments.service';
 import { AvatarStorageService } from './avatar-storage.service';
 import { MAX_CHARACTERS_PER_ACCOUNT } from './constants/characters.constants';
 import { CreateCharacterDto } from './dto/create-character.dto';
@@ -36,6 +32,11 @@ const characterInclude = {
   occupations: {
     where: { isActive: true },
     orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+    include: {
+      establishment: {
+        select: { id: true, slug: true, name: true, logoUrl: true },
+      },
+    },
   },
   staffProfile: {
     include: {
@@ -66,19 +67,11 @@ export class CharactersService {
     private readonly rolesService: RolesService,
     private readonly avatarStorageService: AvatarStorageService,
     private readonly auditService: AuditService,
+    private readonly establishmentsService: EstablishmentsService,
   ) {}
 
   listWorkplaces() {
-    return {
-      civilian: CIVILIAN_WORKPLACES.map((item) => ({
-        slug: item.slug,
-        name: item.name,
-        type: item.type,
-        defaultPosition: item.defaultPosition,
-      })),
-      saedOrganization: 'SAED',
-      note: 'SAED is assigned automatically when a character is promoted to officer.',
-    };
+    return this.establishmentsService.listSelectableCatalog();
   }
 
   async findByAccountId(accountId: string): Promise<ICharacterResponseDto[]> {
@@ -229,10 +222,12 @@ export class CharactersService {
       );
     }
 
-    const workplace = findCivilianWorkplace(dto.organization);
+    const workplace = await this.establishmentsService.findSelectableByOrganization(
+      dto.organization,
+    );
     if (!workplace) {
       throw new BadRequestException(
-        `Invalid organization. Allowed: ${CIVILIAN_WORKPLACES.map((item) => item.name).join(', ')}`,
+        'Invalid organization. Select an establishment from the catalog.',
       );
     }
 
@@ -265,8 +260,9 @@ export class CharactersService {
         },
         occupations: {
           create: {
-            type: workplace.type,
+            type: workplace.occupationType,
             organization: workplace.name,
+            establishmentId: workplace.id,
             position,
             isPrimary: true,
             isActive: true,
@@ -293,7 +289,7 @@ export class CharactersService {
 
     if (dto.status === CharacterStatus.MEDICAL_STAFF || dto.status === CharacterStatus.INTERN) {
       throw new BadRequestException(
-        'Characters cannot self-assign CADET or OFFICER status. Use academy approval or officer promotion.',
+        'Characters cannot self-assign INTERN or MEDICAL_STAFF status. Use academy approval or staff promotion.',
       );
     }
 
@@ -332,20 +328,20 @@ export class CharactersService {
     }
 
     const existing = await this.findByIdForAccount(activeCharacterId, accountId);
-    const belongsToLspd = await this.permissionsService.belongsToLspd(existing.id);
+    const belongsToSaed = await this.permissionsService.belongsToSaed(existing.id);
     const previousOrganization =
       existing.occupations?.find((item) => item.isPrimary)?.organization ??
       existing.occupations?.[0]?.organization ??
       null;
     let nextOrganization: string | null | undefined = undefined;
 
-    if (dto.organization !== undefined && belongsToLspd) {
+    if (dto.organization !== undefined && belongsToSaed) {
       throw new ForbiddenException(
         'SAED members cannot change their establishment. It is managed by the department.',
       );
     }
 
-    if (!belongsToLspd && dto.organization !== undefined) {
+    if (!belongsToSaed && dto.organization !== undefined) {
       const raw = dto.organization?.trim() || '';
       if (!raw) {
         nextOrganization = null;
@@ -354,10 +350,10 @@ export class CharactersService {
           'SAED cannot be selected as a civilian workplace. It is assigned only through department promotion.',
         );
       } else {
-        const workplace = findCivilianWorkplace(raw);
+        const workplace = await this.establishmentsService.findSelectableByOrganization(raw);
         if (!workplace) {
           throw new BadRequestException(
-            `Invalid organization. Allowed: ${CIVILIAN_WORKPLACES.map((item) => item.name).join(', ')}`,
+            'Invalid organization. Select an establishment from the catalog.',
           );
         }
         nextOrganization = workplace.name;
@@ -518,31 +514,19 @@ export class CharactersService {
       return;
     }
 
-    const workplace = findCivilianWorkplace(organizationName);
+    const workplace = await this.establishmentsService.findSelectableByOrganization(
+      organizationName,
+    );
     if (!workplace) {
-      return;
-    }
-
-    if (workplace.slug === 'unemployed') {
-      await tx.occupation.create({
-        data: {
-          characterId,
-          type: workplace.type,
-          organization: workplace.name,
-          position: workplace.defaultPosition,
-          isPrimary: true,
-          isActive: true,
-          startedAt: now,
-        },
-      });
       return;
     }
 
     await tx.occupation.create({
       data: {
         characterId,
-        type: workplace.type,
+        type: workplace.occupationType,
         organization: workplace.name,
+        establishmentId: workplace.id,
         position: workplace.defaultPosition,
         isPrimary: true,
         isActive: true,

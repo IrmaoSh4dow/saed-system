@@ -1,7 +1,9 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
 import { initPasswordToggles, renderPasswordField } from '../components/auth/password-field.js';
 import { renderSubmitButton, setButtonLoading } from '../components/auth/submit-button.js';
-import { CIVILIAN_WORKPLACES, SAED_ORGANIZATION } from '../config/workplaces.js';
+import { renderPageHeader } from '../components/ui/page-header.js';
+import { renderSummaryStrip } from '../components/ui/summary-strip.js';
+import { SAED_ORGANIZATION } from '../config/workplaces.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import {
   setIdentityActiveCharacter,
@@ -13,10 +15,12 @@ import { changeMyPassword, updateMyUsername } from '../services/accounts.service
 import { getApiErrorMessage } from '../services/auth.service.js';
 import {
   listCharacters,
+  listWorkplaces,
   updateMyCharacter,
   uploadCharacterAvatar,
 } from '../services/characters.service.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
+import { isSaedMember as checkIsSaedMember } from '../utils/character.js';
 import { validateImageUploadFile } from '../utils/image-upload.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
@@ -30,7 +34,7 @@ export function settingsPage() {
   }
 
   const { user, activeCharacter } = getAuthState();
-  const isSaedMember = isSaedCharacter(activeCharacter);
+  const isSaedMember = checkIsSaedMember(activeCharacter);
   const currentOrg =
     activeCharacter.primaryOccupation?.organization ??
     activeCharacter.organization ??
@@ -39,18 +43,27 @@ export function settingsPage() {
   const content = `
     <div class="space-y-8">
       ${renderAuthAlert({ id: 'settings-alert' })}
+      ${renderPageHeader({
+        eyebrow: 'Preferencias',
+        title: 'Configuración',
+        description:
+          'Seguridad de la cuenta, identidad activa y datos del personaje seleccionado.',
+      })}
 
-      <section class="surface-card p-6 md:p-8">
-        <p class="landing-eyebrow">Configuración</p>
-        <h2 class="mt-2 text-2xl font-semibold tracking-tight text-white">Preferencias</h2>
-        <p class="mt-3 max-w-2xl text-sm leading-relaxed text-ink-300">
-          Gestiona la seguridad de tu cuenta y la información del personaje activo.
-        </p>
-      </section>
+      ${renderSummaryStrip([
+        { label: 'Usuario', value: escapeHtml(user?.username ?? '—'), tone: 'brand' },
+        {
+          label: 'Personaje',
+          value: escapeHtml(`${activeCharacter.firstName} ${activeCharacter.lastName}`),
+        },
+        { label: 'Organización', value: escapeHtml(currentOrg || '—') },
+        { label: 'Tema', value: 'Oscuro' },
+      ])}
 
       <section class="grid gap-4 lg:grid-cols-2">
-        <article class="surface-card p-6">
-          <h3 class="text-sm font-semibold text-white">Cuenta</h3>
+        <article class="panel p-6">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400">Cuenta</p>
+          <h3 class="mt-1 text-sm font-semibold text-white">Credenciales e identidad</h3>
           <dl class="mt-4 space-y-3 text-sm">
             <div class="flex justify-between gap-4 border-b border-white/5 pb-3">
               <dt class="text-ink-400">Usuario</dt>
@@ -63,7 +76,7 @@ export function settingsPage() {
           </dl>
         </article>
 
-        <article class="surface-card p-6">
+        <article class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Contexto activo</h3>
           <dl class="mt-4 space-y-3 text-sm">
             <div class="flex justify-between gap-4 border-b border-white/5 pb-3">
@@ -82,7 +95,7 @@ export function settingsPage() {
         </article>
       </section>
 
-      <section class="surface-card p-6 md:p-8">
+      <section class="panel p-6 md:p-8">
         <div class="mb-6">
           <h3 class="text-lg font-semibold text-white">Seguridad de la Cuenta</h3>
           <p class="mt-2 text-sm text-ink-400">
@@ -170,7 +183,7 @@ export function settingsPage() {
         </div>
       </section>
 
-      <section class="surface-card p-6 md:p-8">
+      <section class="panel p-6 md:p-8">
         <div class="mb-6">
           <h3 class="text-lg font-semibold text-white">Mi personaje</h3>
           <p class="mt-2 text-sm text-ink-400">
@@ -248,11 +261,8 @@ export function settingsPage() {
               <p class="form-hint mt-2">Los miembros del SAED no pueden cambiar su establecimiento.</p>
             `
                 : `
-              <select id="settings-organization" class="form-input">
-                ${CIVILIAN_WORKPLACES.map(
-                  (item) =>
-                    `<option value="${escapeAttr(item.name)}" ${currentOrg === item.name ? 'selected' : ''}>${escapeHtml(item.name)}</option>`,
-                ).join('')}
+              <select id="settings-organization" class="form-input" data-current-org="${escapeAttr(currentOrg ?? '')}">
+                <option value="">Cargando establecimientos…</option>
               </select>
             `
             }
@@ -275,6 +285,35 @@ export function settingsPage() {
     afterMount(root) {
       document.title = 'Configuración · SAED';
       const cleanup = initDashboardLayout(root);
+
+      const organizationSelect = root.querySelector('#settings-organization');
+      if (organizationSelect && !organizationSelect.disabled) {
+        const currentOrg = organizationSelect.getAttribute('data-current-org') || '';
+        void listWorkplaces()
+          .then((catalog) => {
+            const workplaces = catalog.civilian ?? [];
+            organizationSelect.innerHTML = workplaces
+              .map(
+                (item) =>
+                  `<option value="${escapeAttr(item.name)}" ${currentOrg === item.name ? 'selected' : ''}>${escapeHtml(item.name)}</option>`,
+              )
+              .join('');
+            if (currentOrg && !workplaces.some((item) => item.name === currentOrg)) {
+              organizationSelect.insertAdjacentHTML(
+                'afterbegin',
+                `<option value="${escapeAttr(currentOrg)}" selected>${escapeHtml(currentOrg)}</option>`,
+              );
+            }
+          })
+          .catch((error) => {
+            organizationSelect.innerHTML = `<option value="">Error al cargar</option>`;
+            setAuthAlert(root, {
+              id: 'settings-alert',
+              type: 'error',
+              message: getApiErrorMessage(error, 'No se pudo cargar el catálogo de establecimientos.'),
+            });
+          });
+      }
       initPasswordToggles(root);
       const form = root.querySelector('#my-character-form');
       const usernameForm = root.querySelector('#settings-username-form');
@@ -383,7 +422,7 @@ export function settingsPage() {
             biography: biography || null,
           };
 
-          if (!isSaedCharacter(current) && organizationSelect && !organizationSelect.disabled) {
+          if (!checkIsSaedMember(current) && organizationSelect && !organizationSelect.disabled) {
             payload.organization = organizationSelect.value;
           }
 
@@ -547,15 +586,6 @@ export function settingsPage() {
       };
     },
   };
-}
-
-function isSaedCharacter(character) {
-  if (!character) return false;
-  if (character.staffProfile) return true;
-  if (character.status === 'MEDICAL_STAFF' || character.status === 'INTERN') return true;
-  const org =
-    character.primaryOccupation?.organization ?? character.organization ?? '';
-  return String(org).toLowerCase() === SAED_ORGANIZATION.toLowerCase();
 }
 
 function toDateInput(value) {

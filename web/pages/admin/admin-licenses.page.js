@@ -32,7 +32,7 @@ export function adminLicensesPage() {
       ${
         canManage
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Nueva licencia</h3>
           <form id="create-license-form" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">
@@ -59,7 +59,7 @@ export function adminLicensesPage() {
             <button type="submit" class="btn-primary">Crear licencia</button>
           </form>
         </section>
-        <section id="edit-license-panel" class="surface-card hidden p-6">
+        <section id="edit-license-panel" class="panel hidden p-6">
           <h3 class="text-sm font-semibold text-white">Editar licencia</h3>
           <form id="edit-license-form" class="mt-4 space-y-4">
             <input type="hidden" id="edit-license-id" />
@@ -121,7 +121,7 @@ export function adminLicensesPage() {
                 .map((item) => {
                   const image = resolveUploadUrl(item.imageUrl);
                   return `
-                    <article class="surface-card overflow-hidden">
+                    <article class="panel overflow-hidden">
                       <div class="h-36 w-full overflow-hidden bg-surface-950">
                         ${
                           image

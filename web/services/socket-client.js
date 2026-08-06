@@ -3,6 +3,11 @@ import { getSocketUrl } from '../utils/env.js';
 
 let socketInstance = null;
 
+function applyAuth(socket) {
+  const token = localStorage.getItem('saed.jwt');
+  socket.auth = token ? { token } : {};
+}
+
 export function getSocket() {
   if (socketInstance) {
     return socketInstance;
@@ -12,6 +17,10 @@ export function getSocket() {
     autoConnect: false,
     withCredentials: true,
     transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 800,
+    reconnectionDelayMax: 8000,
   });
 
   return socketInstance;
@@ -19,16 +28,28 @@ export function getSocket() {
 
 export function connectSocket() {
   const socket = getSocket();
-  const token = localStorage.getItem('saed.jwt');
-
-  if (token) {
-    socket.auth = { token };
-  }
+  applyAuth(socket);
 
   if (!socket.connected) {
     socket.connect();
   }
 
+  return socket;
+}
+
+/**
+ * Refresh JWT on the socket (e.g. after character switch) and force reconnect
+ * so account/character rooms match the active session.
+ */
+export function reconnectSocketWithAuth() {
+  const socket = getSocket();
+  applyAuth(socket);
+
+  if (socket.connected) {
+    socket.disconnect();
+  }
+
+  socket.connect();
   return socket;
 }
 

@@ -7,8 +7,8 @@ export function renderStatsSection() {
       <div class="landing-container">
         <div class="mx-auto mb-14 max-w-2xl text-center" data-reveal>
           <p class="landing-eyebrow">Indicadores</p>
-          <h2 class="landing-title">El departamento en cifras</h2>
-          <p class="landing-lead mx-auto">Métricas simuladas que anticipan la escala operativa de la plataforma.</p>
+          <h2 class="landing-title">El SAED en cifras</h2>
+          <p class="landing-lead mx-auto">Métricas que ilustran la escala clínica e institucional de la plataforma.</p>
         </div>
 
         <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
@@ -28,7 +28,7 @@ export function renderStatsSection() {
                   <p class="mt-2 text-sm text-ink-300">${item.label}</p>
                   <div class="mt-5">
                     <div class="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-ink-400">
-                      <span>Carga operativa</span>
+                      <span>Actividad clínica</span>
                       <span>${item.progress}%</span>
                     </div>
                     <div class="progress-track">

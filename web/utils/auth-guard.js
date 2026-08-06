@@ -1,5 +1,5 @@
 import { navigate } from '../utils/router.js';
-import { can } from '../services/auth-context.js';
+import { can, canAny } from '../services/auth-context.js';
 import {
   isAuthenticated,
   logoutCurrentSession,
@@ -57,6 +57,19 @@ export function requirePermission(permission) {
   }
 
   if (!can(permission)) {
+    setAuthRedirect('/dashboard');
+    return false;
+  }
+
+  return true;
+}
+
+export function requireAnyPermission(permissions = []) {
+  if (!requireActiveCharacter()) {
+    return false;
+  }
+
+  if (!canAny(permissions)) {
     setAuthRedirect('/dashboard');
     return false;
   }

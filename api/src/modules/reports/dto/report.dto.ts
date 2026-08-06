@@ -19,6 +19,9 @@ import {
 } from '@prisma/client';
 
 export class CreateReportDto {
+  @IsUUID()
+  patientId!: string;
+
   @IsString()
   @MinLength(3)
   @MaxLength(200)

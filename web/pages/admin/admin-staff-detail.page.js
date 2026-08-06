@@ -1,9 +1,9 @@
 import { renderAuthAlert, setAuthAlert } from '../../components/auth/auth-alert.js';
-import { renderOfficerAuditTimeline } from '../../components/staff/officer-audit-timeline.js';
-import { renderStaffDecorationsGrid } from '../../components/staff/officer-decorations-grid.js';
-import { renderStaffLicensesGrid } from '../../components/staff/officer-licenses-grid.js';
-import { renderStaffDepartmentPanel } from '../../components/staff/officer-department-panel.js';
-import { renderStaffDepartmentsSection } from '../../components/staff/officer-departments-section.js';
+import { renderOfficerAuditTimeline } from '../../components/staff/staff-audit-timeline.js';
+import { renderStaffDecorationsGrid } from '../../components/staff/staff-decorations-grid.js';
+import { renderStaffLicensesGrid } from '../../components/staff/staff-licenses-grid.js';
+import { renderStaffDepartmentPanel } from '../../components/staff/staff-department-panel.js';
+import { renderStaffDepartmentsSection } from '../../components/staff/staff-departments-section.js';
 import { can } from '../../services/auth-context.js';
 import { getApiErrorMessage } from '../../services/auth.service.js';
 import { listAuditLogs } from '../../services/audit.service.js';
@@ -176,7 +176,7 @@ function renderFiche(root, state, permissions) {
 
   const tabs = [
     { id: 'overview', label: 'Resumen' },
-    ...(permissions.canViewComplaints ? [{ id: 'complaints', label: 'Denuncias' }] : []),
+    ...(permissions.canViewComplaints ? [{ id: 'complaints', label: 'Quejas' }] : []),
     ...(permissions.canUpdateOfficer ||
     permissions.canManageIdentity ||
     permissions.canManageDecorations ||
@@ -187,7 +187,7 @@ function renderFiche(root, state, permissions) {
   ];
 
   host.innerHTML = `
-    <section class="surface-card overflow-hidden p-6 md:p-8">
+    <section class="panel overflow-hidden p-6 md:p-8">
       <div class="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div class="h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-surface-950">
           ${
@@ -249,7 +249,7 @@ function renderFiche(root, state, permissions) {
       activeTab === 'overview'
         ? `
       ${renderStaffDepartmentsSection(departmentSource, { showBadge: false, className: 'mt-6' })}
-      <section class="mt-6 surface-card p-6">
+      <section class="mt-6 panel p-6">
         <h3 class="text-sm font-semibold text-white">Condecoraciones</h3>
         <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${renderStaffDecorationsGrid(officerDecorations, {
@@ -257,7 +257,7 @@ function renderFiche(root, state, permissions) {
           })}
         </div>
       </section>
-      <section class="mt-6 surface-card p-6">
+      <section class="mt-6 panel p-6">
         <h3 class="text-sm font-semibold text-white">Licencias</h3>
         <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${renderStaffLicensesGrid(officerLicenses, {
@@ -272,11 +272,11 @@ function renderFiche(root, state, permissions) {
     ${
       activeTab === 'complaints'
         ? `
-      <section class="surface-card p-6">
-        <h3 class="text-sm font-semibold text-white">Historial de denuncias</h3>
+      <section class="panel p-6">
+        <h3 class="text-sm font-semibold text-white">Historial de quejas</h3>
         <p class="mt-1 text-xs text-ink-400">Expediente disciplinario asociado a este personal.</p>
         <div id="officer-complaints-root" class="mt-4 overflow-x-auto">
-          <p class="text-sm text-ink-400">Cargando denuncias...</p>
+          <p class="text-sm text-ink-400">Cargando quejas...</p>
         </div>
       </section>
     `
@@ -305,7 +305,7 @@ function renderFiche(root, state, permissions) {
     ${
       activeTab === 'audit'
         ? `
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Auditoría</h3>
         <p class="mt-1 text-xs text-ink-400">Trayectoria administrativa y profesional dentro del SAED.</p>
         <div class="mt-6">
@@ -337,7 +337,7 @@ function renderManagePanel({
       ${
         canUpdateOfficer
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Gestión operativa</h3>
           <p class="mt-1 text-xs text-ink-400">Rango, departamento y estado.</p>
           <form id="officer-manage-form" class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -387,7 +387,7 @@ function renderManagePanel({
       ${
         canUpdateOfficer
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Departamentos</h3>
           <p class="mt-1 text-xs text-ink-400">Una principal (identidad) y varias alternas con rol propio.</p>
           ${renderAdminDepartmentsManager(officer, staffProfile)}
@@ -424,7 +424,7 @@ function renderManagePanel({
       ${
         canManageIdentity
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Nº de empleado e indicativo</h3>
           <p class="mt-1 text-xs text-ink-400">Solo Chief y Administrator pueden modificar estos datos.</p>
           <form id="officer-identity-form" class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -448,7 +448,7 @@ function renderManagePanel({
       ${
         canManageDecorations
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Condecoraciones</h3>
           <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             ${renderStaffDecorationsGrid(officerDecorations, {
@@ -473,7 +473,7 @@ function renderManagePanel({
       ${
         canManageLicenses
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Licencias</h3>
           <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             ${renderStaffLicensesGrid(officerLicenses, {
@@ -730,7 +730,7 @@ async function loadComplaints(root, staffProfileId) {
               <th class="py-2 pr-4">Estado</th>
               <th class="py-2 pr-4">Fecha</th>
               <th class="py-2 pr-4">Investigador</th>
-              <th class="py-2 pr-4">Denunciante</th>
+              <th class="py-2 pr-4">Quejoso</th>
               <th class="py-2 pr-4">Motivo</th>
               <th class="py-2"></th>
             </tr>
@@ -759,7 +759,7 @@ async function loadComplaints(root, staffProfileId) {
           </tbody>
         </table>
       `
-      : `<p class="text-sm text-ink-400">Este personal no tiene denuncias registradas.</p>`;
+      : `<p class="text-sm text-ink-400">Este personal no tiene quejas registradas.</p>`;
   } catch (error) {
     host.innerHTML = `<p class="text-sm text-rose-300">${getApiErrorMessage(error)}</p>`;
   }

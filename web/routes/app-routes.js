@@ -19,6 +19,10 @@ import { adminNewsPage } from '../pages/admin/admin-news.page.js';
 import { adminGalleryPage } from '../pages/admin/admin-gallery.page.js';
 import { complaintsPage } from '../pages/complaints.page.js';
 import { createComplaintPage } from '../pages/create-complaint.page.js';
+import { appointmentsPage } from '../pages/appointments.page.js';
+import { createAppointmentPage } from '../pages/create-appointment.page.js';
+import { patientsPage } from '../pages/patients.page.js';
+import { createPatientPage } from '../pages/create-patient.page.js';
 import { officersPage } from '../pages/staff.page.js';
 import { departmentsPage } from '../pages/departments.page.js';
 import { allReportsPage, departmentReportsPage, reportsPage } from '../pages/reports.page.js';
@@ -29,6 +33,14 @@ import {
   academyApplyPage,
   academyTransferApplyPage,
 } from '../pages/academy-applications.page.js';
+import { shiftsPage } from '../pages/shifts.page.js';
+import { incentivesPage } from '../pages/incentives.page.js';
+import { adminRequestsPage } from '../pages/admin-requests.page.js';
+import { createAdminRequestPage } from '../pages/create-admin-request.page.js';
+import { agreementsPage } from '../pages/agreements.page.js';
+import { lspdPage } from '../pages/lspd.page.js';
+import { staffRatingsPage } from '../pages/staff-ratings.page.js';
+import { adminEstablishmentsPage } from '../pages/admin/admin-establishments.page.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
 export const privateRoutes = [
@@ -57,6 +69,36 @@ export const privateRoutes = [
     handler: createComplaintPage,
     permission: PERMISSIONS.COMPLAINTS_CREATE,
   },
+  {
+    path: '/appointments',
+    handler: appointmentsPage,
+    permission: PERMISSIONS.APPOINTMENTS_READ,
+  },
+  {
+    path: '/appointments/new',
+    handler: createAppointmentPage,
+    permission: PERMISSIONS.APPOINTMENTS_CREATE,
+  },
+  {
+    path: '/admin-requests',
+    handler: adminRequestsPage,
+    permission: PERMISSIONS.ADMIN_REQUESTS_READ,
+  },
+  {
+    path: '/admin-requests/new',
+    handler: createAdminRequestPage,
+    permission: PERMISSIONS.ADMIN_REQUESTS_CREATE,
+  },
+  {
+    path: '/patients',
+    handler: patientsPage,
+    permission: PERMISSIONS.PATIENTS_READ,
+  },
+  {
+    path: '/patients/new',
+    handler: createPatientPage,
+    permission: PERMISSIONS.PATIENTS_CREATE,
+  },
   { path: '/admin', handler: adminHomePage },
   { path: '/admin/characters', handler: adminCharactersPage },
   { path: '/admin/staff', handler: adminOfficersPage },
@@ -71,10 +113,49 @@ export const privateRoutes = [
   { path: '/admin/academy/applications', handler: adminAcademyApplicationsPage },
   { path: '/admin/news', handler: adminNewsPage },
   { path: '/admin/gallery', handler: adminGalleryPage },
+  { path: '/admin/establishments', handler: adminEstablishmentsPage },
+  {
+    path: '/shifts',
+    handler: shiftsPage,
+    permission: PERMISSIONS.SHIFTS_READ,
+  },
+  {
+    path: '/agreements',
+    handler: agreementsPage,
+    permission: PERMISSIONS.AGREEMENTS_READ,
+  },
+  {
+    path: '/lspd',
+    handler: lspdPage,
+  },
+  {
+    path: '/occupational-health',
+    handler: lspdPage,
+  },
+  {
+    path: '/incentives',
+    handler: incentivesPage,
+    permission: PERMISSIONS.INCENTIVES_READ,
+  },
+  {
+    path: '/incentives/history',
+    handler: incentivesPage,
+    permission: PERMISSIONS.INCENTIVES_READ,
+  },
+  {
+    path: '/incentives/configuration',
+    handler: incentivesPage,
+    permission: PERMISSIONS.INCENTIVES_CONFIGURATION,
+  },
   {
     path: '/staff',
     handler: officersPage,
     permission: PERMISSIONS.STAFF_READ,
+  },
+  {
+    path: '/staff-ratings',
+    handler: staffRatingsPage,
+    permission: PERMISSIONS.STAFF_RATINGS_READ,
   },
   {
     path: '/departments',

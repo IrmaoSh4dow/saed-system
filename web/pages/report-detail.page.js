@@ -35,10 +35,11 @@ const PRIORITY_LABELS = {
 };
 
 const TYPE_LABELS = {
-  INCIDENT: 'Incidente',
-  INVESTIGATION: 'Investigación',
+  CONSULTATION: 'Consulta',
+  DIAGNOSTIC: 'Diagnóstico',
+  PROCEDURE: 'Procedimiento',
+  HOSPITALIZATION: 'Hospitalización',
   INTERNAL: 'Interno',
-  ACTIVITY: 'Actividad',
   OTHER: 'Otro',
 };
 
@@ -70,6 +71,7 @@ export function reportDetailPage(reportId) {
       const cleanup = initDashboardLayout(root);
       let report = null;
       let departments = [];
+      let activeTab = 'overview';
 
       const refresh = async () => {
         report = await getReport(reportId);
@@ -81,7 +83,10 @@ export function reportDetailPage(reportId) {
       };
 
       const paint = () => {
-        renderDetail(root, report, departments);
+        renderDetail(root, report, departments, activeTab);
+        bindReportTabs(root, (tabId) => {
+          activeTab = tabId;
+        });
         bindDetail(root, report, { onReload: refresh });
       };
 
@@ -98,7 +103,34 @@ export function reportDetailPage(reportId) {
   };
 }
 
-function renderDetail(root, report, departments) {
+function bindReportTabs(root, onChange) {
+  const host = root.querySelector('#report-detail-root');
+  if (!host) return;
+
+  host.querySelectorAll('[data-report-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const tab = button.getAttribute('data-report-tab');
+      host.querySelectorAll('[data-report-tab]').forEach((item) => {
+        const active = item.getAttribute('data-report-tab') === tab;
+        item.className = tabButtonClass(active);
+      });
+      host.querySelectorAll('[data-report-panel]').forEach((panel) => {
+        panel.classList.toggle('hidden', panel.getAttribute('data-report-panel') !== tab);
+      });
+      onChange?.(tab);
+    });
+  });
+}
+
+function tabButtonClass(active) {
+  return `rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+    active
+      ? 'border-brand-400/40 bg-brand-500/15 text-white'
+      : 'border-white/10 text-ink-300 hover:border-white/20 hover:text-white'
+  }`;
+}
+
+function renderDetail(root, report, departments, activeTab = 'overview') {
   const host = root.querySelector('#report-detail-root');
   if (!host || !report) return;
 
@@ -107,249 +139,398 @@ function renderDetail(root, report, departments) {
   const canManageParticipants = Boolean(access.canManageParticipants ?? access.canManage);
   const lead = report.leadStaff;
   const leadName = lead ? `${lead.character.firstName} ${lead.character.lastName}` : 'Sin asignar';
+  const patient = report.patient;
+  const patientName = patient
+    ? `HC #${patient.recordNumber} · ${patient.firstName} ${patient.lastName}`
+    : 'Sin paciente';
   const canTransfer =
     access.canTransfer || can(PERMISSIONS.REPORTS_TRANSFER) || can(PERMISSIONS.ADMIN_ACCESS);
 
+  const statusTone =
+    report.status === 'COMPLETED'
+      ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+      : report.status === 'UNDER_REVIEW'
+        ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
+        : report.status === 'ARCHIVED'
+          ? 'border-white/10 bg-white/[0.03] text-ink-300'
+          : 'border-sky-400/30 bg-sky-500/10 text-sky-200';
+
+  const participantCount = (report.participants ?? []).length;
+  const evidenceCount = (report.evidence ?? []).length;
+  const transferCount = (report.transfers ?? []).length;
+  const descriptionPreview =
+    String(report.description ?? '').trim().length > 280
+      ? `${String(report.description).trim().slice(0, 280)}…`
+      : String(report.description ?? '').trim();
+
+  const tabs = [
+    { id: 'overview', label: 'Resumen' },
+    { id: 'narrative', label: 'Narrativa' },
+    { id: 'team', label: `Equipo${participantCount ? ` (${participantCount})` : ''}` },
+    { id: 'evidence', label: `Evidencias${evidenceCount ? ` (${evidenceCount})` : ''}` },
+    { id: 'transfers', label: `Derivaciones${transferCount ? ` (${transferCount})` : ''}` },
+  ];
+
   host.innerHTML = `
-    <section class="space-y-6">
-    <section class="surface-card p-5 md:p-8">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div class="min-w-0">
-          <p class="landing-eyebrow">Informe #${report.reportNumber}</p>
-          <h2 class="mt-1 text-2xl font-semibold text-white">${escapeHtml(report.title)}</h2>
-          <p class="mt-2 text-sm text-ink-300">
-            ${TYPE_LABELS[report.type] ?? report.type} · ${STATUS_LABELS[report.status] ?? report.status} · Prioridad ${PRIORITY_LABELS[report.priority] ?? report.priority}
+    <div class="space-y-5">
+      <section class="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-950">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(217,30,30,0.14),_transparent_45%)]"></div>
+        <div class="relative space-y-5 p-5 md:p-6">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-300">Informe clínico · #${report.reportNumber}</p>
+                <span class="rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${statusTone}">
+                  ${escapeHtml(STATUS_LABELS[report.status] ?? report.status)}
+                </span>
+                <span class="rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] text-ink-300">
+                  Prioridad ${escapeHtml(PRIORITY_LABELS[report.priority] ?? report.priority)}
+                </span>
+              </div>
+              <h2 class="mt-3 text-2xl font-semibold tracking-tight text-white md:text-3xl">${escapeHtml(report.title)}</h2>
+              <p class="mt-2 text-sm text-ink-400">
+                ${escapeHtml(TYPE_LABELS[report.type] ?? report.type)}
+                · ${escapeHtml(report.department?.name ?? 'Sin departamento')}
+              </p>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2 lg:w-[22rem]">
+              <div class="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
+                <p class="text-[10px] uppercase tracking-wide text-ink-500">Paciente</p>
+                ${
+                  patient
+                    ? `<a data-link href="/patients?id=${patient.id}" class="mt-1 block truncate text-sm font-semibold text-white hover:text-brand-200">${escapeHtml(patientName)}</a>`
+                    : `<p class="mt-1 text-sm text-rose-300">${escapeHtml(patientName)}</p>`
+                }
+              </div>
+              <div class="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
+                <p class="text-[10px] uppercase tracking-wide text-ink-500">Responsable</p>
+                <p class="mt-1 truncate text-sm font-semibold text-white">${escapeHtml(leadName)}</p>
+                ${lead ? `<p class="mt-0.5 truncate text-[11px] text-ink-500">Nº ${escapeHtml(lead.employeeNumber)}</p>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <nav class="flex flex-wrap gap-2 border-t border-white/10 pt-4" aria-label="Secciones del informe">
+            ${tabs
+              .map(
+                (tab) => `
+                  <button type="button" data-report-tab="${tab.id}" class="${tabButtonClass(tab.id === activeTab)}">
+                    ${escapeHtml(tab.label)}
+                  </button>
+                `,
+              )
+              .join('')}
+          </nav>
+        </div>
+      </section>
+
+      <div data-report-panel="overview" class="${activeTab === 'overview' ? '' : 'hidden'} space-y-4">
+        <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          ${meta('Departamento', report.department?.name ?? '—')}
+          ${meta('Lugar', report.location ?? '—')}
+          ${meta('Fecha incidente', formatDateLabel(report.incidentDate))}
+          ${meta('Creado', formatDateTimeLabel(report.createdAt))}
+        </dl>
+
+        <div class="grid gap-4 lg:grid-cols-3">
+          <article class="rounded-2xl border border-white/10 px-4 py-4">
+            <p class="text-[11px] uppercase tracking-wide text-ink-500">Equipo</p>
+            <p class="mt-2 text-2xl font-semibold text-white">${participantCount}</p>
+            <p class="mt-1 text-xs text-ink-400">profesionales involucrados</p>
+          </article>
+          <article class="rounded-2xl border border-white/10 px-4 py-4">
+            <p class="text-[11px] uppercase tracking-wide text-ink-500">Evidencias</p>
+            <p class="mt-2 text-2xl font-semibold text-white">${evidenceCount}</p>
+            <p class="mt-1 text-xs text-ink-400">adjuntos registrados</p>
+          </article>
+          <article class="rounded-2xl border border-white/10 px-4 py-4">
+            <p class="text-[11px] uppercase tracking-wide text-ink-500">Derivaciones</p>
+            <p class="mt-2 text-2xl font-semibold text-white">${transferCount}</p>
+            <p class="mt-1 text-xs text-ink-400">movimientos de departamento</p>
+          </article>
+        </div>
+
+        <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-sm font-semibold text-white">Resumen de la narrativa</h3>
+            <button type="button" data-report-tab="narrative" class="text-xs font-medium text-brand-300 hover:text-brand-200">
+              Abrir narrativa completa →
+            </button>
+          </div>
+          <p class="mt-4 whitespace-pre-wrap text-sm leading-7 text-ink-200">
+            ${escapeHtml(descriptionPreview || 'Sin descripción registrada.')}
           </p>
-        </div>
-        <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
-          <p class="text-[11px] uppercase tracking-wide text-ink-500">Encargado</p>
-          <p class="mt-1 font-medium text-white">${escapeHtml(leadName)}</p>
-          ${lead ? `<p class="mt-1 text-xs text-ink-400">Badge ${escapeHtml(lead.employeeNumber)}</p>` : ''}
-        </div>
+        </article>
       </div>
 
-      <p class="mt-6 whitespace-pre-wrap text-sm leading-relaxed text-ink-200">${escapeHtml(report.description)}</p>
-
-      <dl class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 text-sm">
-        ${meta('Departamento', report.department?.name ?? '—')}
-        ${meta('Lugar', report.location ?? '—')}
-        ${meta('Fecha incidente', formatDateLabel(report.incidentDate))}
-        ${meta('Creado', formatDateTimeLabel(report.createdAt))}
-      </dl>
-    </section>
-
-    <section class="grid gap-6 xl:grid-cols-2">
-      <article class="surface-card p-5">
-        <h3 class="text-sm font-semibold text-white">Personal involucrado</h3>
-        <div class="mt-4 space-y-3">
-          ${
-            (report.participants ?? []).length
-              ? report.participants
-                  .map((item) => {
-                    const officer = item.staffProfile;
-                    const name = `${officer.character.firstName} ${officer.character.lastName}`;
-                    const avatar = resolveUploadUrl(officer.character.avatarUrl);
-                    return `
-                    <div class="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2">
-                      <div class="h-10 w-10 overflow-hidden rounded-xl bg-surface-950">
-                        ${avatar ? `<img src="${avatar}" alt="" class="h-full w-full object-cover" />` : ''}
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm text-white">${escapeHtml(name)}</p>
-                        <p class="truncate text-xs text-ink-400">${escapeHtml(officer.employeeNumber)} · ${escapeHtml(officer.rank?.name ?? '—')}</p>
-                      </div>
-                      ${
-                        canManageParticipants
-                          ? `<button type="button" class="text-xs text-rose-300" data-remove-participant="${officer.id}">Quitar</button>`
-                          : ''
-                      }
-                    </div>
-                  `;
-                  })
-                  .join('')
-              : `<p class="text-sm text-ink-400">Sin personal involucrado.</p>`
-          }
-        </div>
-        ${
-          canManageParticipants
-            ? `
-          <div class="mt-4 border-t border-white/10 pt-4">
-            <label class="form-label" for="participant-query">Agregar personal</label>
-            <input id="participant-query" class="form-input" placeholder="Nombre o badge..." autocomplete="off" />
-            <div id="participant-results" class="mt-2 space-y-2"></div>
+      <div data-report-panel="narrative" class="${activeTab === 'narrative' ? '' : 'hidden'} space-y-4">
+        <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Narrativa clínica</h3>
+              <p class="mt-1 text-xs text-ink-500">Descripción completa del informe médico.</p>
+            </div>
           </div>
-        `
-            : ''
-        }
-      </article>
+          <div class="mt-5 rounded-2xl border border-white/8 bg-black/20 px-4 py-5 md:px-5">
+            <p class="whitespace-pre-wrap text-sm leading-7 text-ink-100">${escapeHtml(report.description || 'Sin descripción.')}</p>
+          </div>
+        </article>
 
-      <article class="surface-card p-5">
-        <h3 class="text-sm font-semibold text-white">Evidencias</h3>
-        <div class="mt-4 space-y-3">
-          ${
-            (report.evidence ?? []).length
-              ? report.evidence
-                  .map((item) => {
-                    const uploader = item.uploadedByCharacter
-                      ? `${item.uploadedByCharacter.firstName} ${item.uploadedByCharacter.lastName}`
-                      : null;
-                    const metaLine = [
-                      item.originalName,
-                      uploader ? `por ${uploader}` : null,
-                      formatDateTimeLabel(item.createdAt),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ');
-
-                    if (item.type === 'IMAGE') {
-                      const src = resolveUploadUrl(item.value);
-                      return `
-                      <div class="overflow-hidden rounded-xl border border-white/10">
-                        <div class="h-40 bg-surface-950">
-                          <img src="${src}" alt="${escapeHtml(item.label ?? item.originalName ?? 'Evidencia')}" class="h-full w-full object-contain" />
-                        </div>
-                        <div class="space-y-0.5 px-3 py-2">
-                          <p class="text-xs text-ink-300">${escapeHtml(item.label ?? item.originalName ?? 'Imagen')}</p>
-                          ${metaLine ? `<p class="text-[11px] text-ink-500">${escapeHtml(metaLine)}</p>` : ''}
-                        </div>
-                      </div>
-                    `;
-                    }
-                    return `
-                    <a href="${escapeHtml(item.value)}" target="_blank" rel="noopener noreferrer" class="block rounded-xl border border-white/10 px-3 py-3 text-sm text-brand-300 hover:text-brand-200">
-                      <span class="block truncate">${escapeHtml(item.label ?? item.type)} · ${escapeHtml(item.value)}</span>
-                      ${metaLine ? `<span class="mt-1 block text-[11px] text-ink-500">${escapeHtml(metaLine)}</span>` : ''}
-                    </a>
-                  `;
-                  })
-                  .join('')
-              : `<p class="text-sm text-ink-400">Sin evidencias.</p>`
-          }
-        </div>
         ${
           canCollaborate
             ? `
-          <form id="evidence-form" class="mt-4 space-y-3 border-t border-white/10 pt-4">
-            <div>
-              <label class="form-label" for="evidence-type">Tipo</label>
-              <select id="evidence-type" class="form-input">
-                <option value="IMAGE">Fotografía</option>
-                <option value="VIDEO_URL">URL de clip</option>
-                <option value="DOCUMENT">Documento (URL)</option>
-              </select>
-            </div>
-            <div id="evidence-image-wrap">
-              <label class="form-label" for="evidence-image">Imagen</label>
-              <input id="evidence-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="form-input" />
-              <p class="mt-1 text-[11px] text-ink-500">JPEG, PNG, WebP o GIF · máx. 8 MB</p>
-            </div>
-            <div id="evidence-url-wrap" class="hidden">
-              <label class="form-label" for="evidence-url">URL</label>
-              <input id="evidence-url" class="form-input" maxlength="4000" />
-            </div>
-            <div>
-              <label class="form-label" for="evidence-label">Etiqueta</label>
-              <input id="evidence-label" class="form-input" maxlength="160" />
-            </div>
-            <button type="submit" class="btn-secondary">Añadir evidencia</button>
-          </form>
+          <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+            <h3 class="text-sm font-semibold text-white">Actualizar informe</h3>
+            <p class="mt-1 text-xs text-ink-500">Modifica la narrativa, el estado o la prioridad.</p>
+            <form id="report-update-form" class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div class="sm:col-span-2">
+                <label class="form-label" for="update-description">Descripción</label>
+                <textarea id="update-description" class="form-input min-h-36" maxlength="8000" required>${escapeHtml(report.description)}</textarea>
+              </div>
+              <div>
+                <label class="form-label" for="update-status">Estado</label>
+                <select id="update-status" class="form-input">
+                  ${Object.entries(STATUS_LABELS)
+                    .map(
+                      ([value, label]) =>
+                        `<option value="${value}" ${report.status === value ? 'selected' : ''}>${label}</option>`,
+                    )
+                    .join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="update-priority">Prioridad</label>
+                <select id="update-priority" class="form-input">
+                  ${Object.entries(PRIORITY_LABELS)
+                    .map(
+                      ([value, label]) =>
+                        `<option value="${value}" ${report.priority === value ? 'selected' : ''}>${label}</option>`,
+                    )
+                    .join('')}
+                </select>
+              </div>
+              <div class="sm:col-span-2 flex justify-end">
+                <button type="submit" class="btn-primary">Guardar cambios</button>
+              </div>
+            </form>
+          </article>
         `
             : ''
         }
-      </article>
-    </section>
+      </div>
 
-    ${
-      canCollaborate
-        ? `
-      <section class="surface-card p-5">
-        <h3 class="text-sm font-semibold text-white">Actualizar informe</h3>
-        <form id="report-update-form" class="mt-4 grid gap-4 sm:grid-cols-2">
-          <div class="sm:col-span-2">
-            <label class="form-label" for="update-description">Descripción</label>
-            <textarea id="update-description" class="form-input min-h-28" maxlength="8000" required>${escapeHtml(report.description)}</textarea>
+      <div data-report-panel="team" class="${activeTab === 'team' ? '' : 'hidden'}">
+        <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Equipo involucrado</h3>
+              <p class="mt-1 text-xs text-ink-500">Personal médico asociado a este informe.</p>
+            </div>
+            <p class="text-xs text-ink-500">${participantCount} miembro${participantCount === 1 ? '' : 's'}</p>
           </div>
-          <div>
-            <label class="form-label" for="update-status">Estado</label>
-            <select id="update-status" class="form-input">
-              ${Object.entries(STATUS_LABELS)
-                .map(
-                  ([value, label]) =>
-                    `<option value="${value}" ${report.status === value ? 'selected' : ''}>${label}</option>`,
-                )
-                .join('')}
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="update-priority">Prioridad</label>
-            <select id="update-priority" class="form-input">
-              ${Object.entries(PRIORITY_LABELS)
-                .map(
-                  ([value, label]) =>
-                    `<option value="${value}" ${report.priority === value ? 'selected' : ''}>${label}</option>`,
-                )
-                .join('')}
-            </select>
-          </div>
-          <div class="sm:col-span-2">
-            <button type="submit" class="btn-primary">Guardar cambios</button>
-          </div>
-        </form>
-      </section>
-    `
-        : ''
-    }
 
-    ${
-      canTransfer
-        ? `
-      <section class="surface-card p-5">
-        <h3 class="text-sm font-semibold text-white">Derivar a otro departamento</h3>
-        <p class="mt-1 text-xs text-ink-400">Exclusivo de comando. El historial de derivaciones se conserva.</p>
-        <form id="transfer-form" class="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-          <div>
-            <label class="form-label" for="transfer-department">Nuevo departamento</label>
-            <select id="transfer-department" class="form-input" required>
-              <option value="">Seleccionar...</option>
-              ${departments
-                .filter((item) => item.id !== report.departmentId)
-                .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
-                .join('')}
-            </select>
+          <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            ${
+              participantCount
+                ? report.participants
+                    .map((item) => {
+                      const officer = item.staffProfile;
+                      const name = `${officer.character.firstName} ${officer.character.lastName}`;
+                      const avatar = resolveUploadUrl(officer.character.avatarUrl);
+                      return `
+                        <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3.5 py-3">
+                          <div class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-surface-950 text-xs font-semibold text-brand-300">
+                            ${avatar ? `<img src="${avatar}" alt="" class="h-full w-full object-cover" />` : escapeHtml((name.match(/\b\w/g) || []).slice(0, 2).join('').toUpperCase())}
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-white">${escapeHtml(name)}</p>
+                            <p class="truncate text-xs text-ink-400">${escapeHtml(officer.employeeNumber)} · ${escapeHtml(officer.rank?.name ?? '—')}</p>
+                          </div>
+                          ${
+                            canManageParticipants
+                              ? `<button type="button" class="shrink-0 text-xs text-rose-300 hover:text-rose-200" data-remove-participant="${officer.id}">Quitar</button>`
+                              : ''
+                          }
+                        </div>
+                      `;
+                    })
+                    .join('')
+                : `<p class="text-sm text-ink-400 sm:col-span-2 xl:col-span-3">Sin personal involucrado.</p>`
+            }
           </div>
-          <div>
-            <label class="form-label" for="transfer-notes">Notas</label>
-            <input id="transfer-notes" class="form-input" maxlength="2000" />
-          </div>
-          <button type="submit" class="btn-secondary">Derivar</button>
-        </form>
-      </section>
-    `
-        : ''
-    }
 
-    <section class="surface-card p-5">
-      <h3 class="text-sm font-semibold text-white">Historial de derivaciones</h3>
-      <ul class="mt-4 space-y-2">
+          ${
+            canManageParticipants
+              ? `
+            <div class="mt-6 border-t border-white/10 pt-5">
+              <label class="form-label" for="participant-query">Agregar personal</label>
+              <input id="participant-query" class="form-input max-w-xl" placeholder="Nombre o badge..." autocomplete="off" />
+              <div id="participant-results" class="mt-2 max-h-48 max-w-xl space-y-2 overflow-y-auto"></div>
+            </div>
+          `
+              : ''
+          }
+        </article>
+      </div>
+
+      <div data-report-panel="evidence" class="${activeTab === 'evidence' ? '' : 'hidden'} space-y-4">
+        <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Evidencias</h3>
+              <p class="mt-1 text-xs text-ink-500">Material clínico adjunto al informe.</p>
+            </div>
+            <p class="text-xs text-ink-500">${evidenceCount} archivo${evidenceCount === 1 ? '' : 's'}</p>
+          </div>
+
+          <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            ${
+              evidenceCount
+                ? report.evidence
+                    .map((item) => {
+                      const uploader = item.uploadedByCharacter
+                        ? `${item.uploadedByCharacter.firstName} ${item.uploadedByCharacter.lastName}`
+                        : null;
+                      const metaLine = [
+                        item.originalName,
+                        uploader ? `por ${uploader}` : null,
+                        formatDateTimeLabel(item.createdAt),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ');
+
+                      if (item.type === 'IMAGE') {
+                        const src = resolveUploadUrl(item.value);
+                        return `
+                          <div class="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+                            <div class="h-44 bg-surface-950">
+                              <img src="${src}" alt="${escapeHtml(item.label ?? item.originalName ?? 'Evidencia')}" class="h-full w-full object-contain" />
+                            </div>
+                            <div class="space-y-0.5 px-3 py-2.5">
+                              <p class="text-xs text-ink-200">${escapeHtml(item.label ?? item.originalName ?? 'Imagen')}</p>
+                              ${metaLine ? `<p class="text-[11px] text-ink-500">${escapeHtml(metaLine)}</p>` : ''}
+                            </div>
+                          </div>
+                        `;
+                      }
+                      return `
+                        <a href="${escapeHtml(item.value)}" target="_blank" rel="noopener noreferrer" class="block rounded-2xl border border-white/10 px-4 py-4 text-sm text-brand-300 transition hover:border-brand-400/30 hover:bg-brand-500/5">
+                          <span class="block truncate font-medium">${escapeHtml(item.label ?? item.type)}</span>
+                          <span class="mt-1 block truncate text-xs text-ink-500">${escapeHtml(item.value)}</span>
+                          ${metaLine ? `<span class="mt-2 block text-[11px] text-ink-500">${escapeHtml(metaLine)}</span>` : ''}
+                        </a>
+                      `;
+                    })
+                    .join('')
+                : `<p class="text-sm text-ink-400 sm:col-span-2 xl:col-span-3">Sin evidencias registradas.</p>`
+            }
+          </div>
+        </article>
+
         ${
-          (report.transfers ?? []).length
-            ? report.transfers
-                .map(
-                  (item) => `
-                  <li class="rounded-xl border border-white/10 px-3 py-2 text-sm text-ink-300">
-                    <span class="text-ink-500">${formatDateTimeLabel(item.createdAt)}</span>
-                    · ${escapeHtml(item.fromDepartment?.name ?? 'Sin departamento')} → ${escapeHtml(item.toDepartment?.name ?? '—')}
-                    · ${escapeHtml(item.transferredByCharacter?.firstName ?? '')} ${escapeHtml(item.transferredByCharacter?.lastName ?? '')}
-                    ${item.notes ? `<span class="block mt-1 text-xs text-ink-400">${escapeHtml(item.notes)}</span>` : ''}
-                  </li>
-                `,
-                )
-                .join('')
-            : `<li class="text-sm text-ink-400">Sin derivaciones.</li>`
+          canCollaborate
+            ? `
+          <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+            <h3 class="text-sm font-semibold text-white">Añadir evidencia</h3>
+            <form id="evidence-form" class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="form-label" for="evidence-type">Tipo</label>
+                <select id="evidence-type" class="form-input">
+                  <option value="IMAGE">Fotografía</option>
+                  <option value="VIDEO_URL">URL de clip</option>
+                  <option value="DOCUMENT">Documento (URL)</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="evidence-label">Etiqueta</label>
+                <input id="evidence-label" class="form-input" maxlength="160" />
+              </div>
+              <div id="evidence-image-wrap" class="sm:col-span-2">
+                <label class="form-label" for="evidence-image">Imagen</label>
+                <input id="evidence-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="form-input" />
+                <p class="mt-1 text-[11px] text-ink-500">JPEG, PNG, WebP o GIF · máx. 8 MB</p>
+              </div>
+              <div id="evidence-url-wrap" class="hidden sm:col-span-2">
+                <label class="form-label" for="evidence-url">URL</label>
+                <input id="evidence-url" class="form-input" maxlength="4000" />
+              </div>
+              <div class="sm:col-span-2">
+                <button type="submit" class="btn-secondary">Añadir evidencia</button>
+              </div>
+            </form>
+          </article>
+        `
+            : ''
         }
-      </ul>
-    </section>
-    </section>
+      </div>
+
+      <div data-report-panel="transfers" class="${activeTab === 'transfers' ? '' : 'hidden'} space-y-4">
+        <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Historial de derivaciones</h3>
+              <p class="mt-1 text-xs text-ink-500">Trayectoria del informe entre departamentos.</p>
+            </div>
+          </div>
+          <ul class="mt-5 space-y-2">
+            ${
+              transferCount
+                ? report.transfers
+                    .map(
+                      (item) => `
+                        <li class="rounded-2xl border border-white/10 px-4 py-3">
+                          <p class="text-sm text-white">
+                            ${escapeHtml(item.fromDepartment?.name ?? 'Sin departamento')}
+                            <span class="text-ink-500"> → </span>
+                            ${escapeHtml(item.toDepartment?.name ?? '—')}
+                          </p>
+                          <p class="mt-1 text-xs text-ink-500">
+                            ${escapeHtml(formatDateTimeLabel(item.createdAt))}
+                            ${
+                              item.transferredByCharacter
+                                ? ` · ${escapeHtml(item.transferredByCharacter.firstName)} ${escapeHtml(item.transferredByCharacter.lastName)}`
+                                : ''
+                            }
+                          </p>
+                          ${item.notes ? `<p class="mt-2 text-sm text-ink-300">${escapeHtml(item.notes)}</p>` : ''}
+                        </li>
+                      `,
+                    )
+                    .join('')
+                : `<li class="text-sm text-ink-400">Sin derivaciones registradas.</li>`
+            }
+          </ul>
+        </article>
+
+        ${
+          canTransfer
+            ? `
+          <article class="rounded-3xl border border-white/10 p-5 md:p-6">
+            <h3 class="text-sm font-semibold text-white">Derivar informe</h3>
+            <p class="mt-1 text-xs text-ink-500">Exclusivo de comando. El historial se conserva.</p>
+            <form id="transfer-form" class="mt-5 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div>
+                <label class="form-label" for="transfer-department">Nuevo departamento</label>
+                <select id="transfer-department" class="form-input" required>
+                  <option value="">Seleccionar...</option>
+                  ${departments
+                    .filter((item) => item.id !== report.departmentId)
+                    .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
+                    .join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="transfer-notes">Notas</label>
+                <input id="transfer-notes" class="form-input" maxlength="2000" />
+              </div>
+              <button type="submit" class="btn-secondary">Derivar</button>
+            </form>
+          </article>
+        `
+            : ''
+        }
+      </div>
+    </div>
   `;
 }
 

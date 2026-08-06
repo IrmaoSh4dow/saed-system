@@ -1,6 +1,6 @@
 export const mockStats = [
   {
-    id: 'officers',
+    id: 'staff',
     label: 'Personal médico registrado',
     value: 248,
     progress: 78,
@@ -8,19 +8,19 @@ export const mockStats = [
     icon: 'users',
   },
   {
-    id: 'cases',
-    label: 'Casos resueltos',
-    value: 1420,
-    progress: 86,
+    id: 'patients',
+    label: 'Pacientes atendidos',
+    value: 3640,
+    progress: 84,
     hint: 'Últimos 12 meses',
-    icon: 'search',
+    icon: 'heartPulse',
   },
   {
     id: 'reports',
-    label: 'Informes creados',
+    label: 'Informes clínicos',
     value: 8900,
     progress: 92,
-    hint: 'Documentación oficial',
+    hint: 'Documentación médica',
     icon: 'file',
   },
   {
@@ -28,7 +28,7 @@ export const mockStats = [
     label: 'Internos en formación',
     value: 42,
     progress: 64,
-    hint: 'Academia SAED',
+    hint: 'Academia médica',
     icon: 'book',
   },
 ];

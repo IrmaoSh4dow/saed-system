@@ -1,3 +1,5 @@
+import { renderDashTabs } from '../../components/ui/dash-tabs.js';
+import { renderPageHeader } from '../../components/ui/page-header.js';
 import { getVisibleAdminNavigation } from '../../config/navigation.js';
 import { initDashboardLayout, renderDashboardLayout } from '../../layouts/dashboard.layout.js';
 import { getAuthState } from '../../services/auth-context.js';
@@ -42,28 +44,21 @@ export function renderAdminShell(contentHtml, { title, currentPath }) {
 
   const adminContent = `
     <div class="space-y-6">
-      <section class="surface-card p-5 md:p-6">
-        <p class="landing-eyebrow">Administración</p>
-        <h2 class="mt-2 text-2xl font-semibold tracking-tight text-white">${title}</h2>
-        <nav class="mt-5 flex flex-wrap gap-2">
-          ${links
-            .map((item) => {
-              const active = currentPath === item.path;
-              return `
-                <a
-                  data-link
-                  href="${item.path}"
-                  class="rounded-xl px-3 py-2 text-sm font-medium transition ${
-                    active
-                      ? 'bg-brand-500/15 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
-                      : 'border border-white/10 text-ink-300 hover:bg-white/[0.04] hover:text-white'
-                  }"
-                >${item.name}</a>
-              `;
-            })
-            .join('')}
-        </nav>
-      </section>
+      ${renderPageHeader({
+        eyebrow: 'Administración',
+        title,
+        description: 'Centro de control institucional del SAED. Gestiona personal, catálogos y contenido.',
+      })}
+      <div class="admin-nav-shell">
+        ${renderDashTabs(
+          links.map((item) => ({
+            id: item.path,
+            href: item.path,
+            label: item.name,
+            active: currentPath === item.path,
+          })),
+        )}
+      </div>
       ${contentHtml}
     </div>
   `;

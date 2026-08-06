@@ -4,6 +4,7 @@ import {
   renderTrainingCalendar,
 } from '../components/academy/training-calendar.js';
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
+import { renderPageHeader } from '../components/ui/page-header.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { can, canAny, getAuthState } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
@@ -61,19 +62,16 @@ export function academyPage() {
   const content = `
     <div class="space-y-8">
       ${renderAuthAlert({ id: 'academy-alert' })}
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0">
-          <p class="landing-eyebrow">Formación</p>
-          <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Academia SAED</h2>
-          <p class="mt-2 max-w-2xl text-sm leading-relaxed text-ink-300">
-            Entrenamientos, anuncios y calendario de actividades.
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          ${showApplications ? `<a data-link href="/academy/applications" class="btn-secondary">Mis postulaciones</a>` : ''}
-          ${canManage ? `<a data-link href="/admin/academy" class="btn-secondary">Administrar</a>` : ''}
-        </div>
-      </div>
+      ${renderPageHeader({
+        eyebrow: 'Formación médica',
+        title: 'Academia SAED',
+        description:
+          'Centro de entrenamiento: calendario, anuncios, asistencia y seguimiento de cursos.',
+        actionsHtml: `
+          ${showApplications ? `<a data-link href="/academy/applications" class="btn-secondary !py-2.5">Mis postulaciones</a>` : ''}
+          ${canManage ? `<a data-link href="/admin/academy" class="btn-secondary !py-2.5">Administrar</a>` : ''}
+        `,
+      })}
       <div id="academy-root"><p class="text-sm text-ink-400">Cargando academia...</p></div>
     </div>
   `;
@@ -137,33 +135,37 @@ function paint(root, data, { canManage, isCadet, onReload }) {
   });
 
   host.innerHTML = `
-    <section class="grid gap-8 xl:grid-cols-5">
-      <article class="surface-card p-5 md:p-6 xl:col-span-3">
-        <div data-calendar-host>${calendarHtml}</div>
+    <section class="grid gap-6 xl:grid-cols-12">
+      <article class="panel relative overflow-hidden p-5 md:p-6 xl:col-span-8">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(217,30,30,0.08),_transparent_45%)]"></div>
+        <div class="relative" data-calendar-host>${calendarHtml}</div>
       </article>
 
-      <article class="surface-card flex flex-col gap-5 p-5 md:p-6 xl:col-span-2">
+      <article class="panel flex flex-col gap-5 p-5 md:p-6 xl:col-span-4">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="text-sm font-semibold text-white">Anuncios</h3>
-          <span class="text-xs text-ink-500">${announcements.length}</span>
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400">Comunicados</p>
+            <h3 class="mt-1 text-sm font-semibold text-white">Anuncios de academia</h3>
+          </div>
+          <span class="rounded-full border border-white/10 px-2.5 py-1 text-xs text-ink-300">${announcements.length}</span>
         </div>
-        <div class="max-h-[28rem] space-y-4 overflow-y-auto pr-1">
+        <div class="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
           ${
             announcements.length
               ? announcements
                   .map(
                     (item) => `
-                <div class="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+                <article class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 transition hover:border-brand-400/20">
                   <div class="flex flex-wrap items-center gap-2">
                     <p class="text-sm font-medium text-white">${escapeHtml(item.title)}</p>
-                    <span class="rounded-lg bg-brand-500/15 px-2 py-0.5 text-[11px] text-brand-200">${PRIORITY_LABELS[item.priority] ?? item.priority}</span>
+                    <span class="rounded-lg bg-brand-500/15 px-2 py-0.5 text-[11px] text-brand-300">${PRIORITY_LABELS[item.priority] ?? item.priority}</span>
                   </div>
                   <p class="mt-3 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-ink-300">${escapeHtml(item.content)}</p>
                   <p class="mt-3 text-[11px] text-ink-500">
                     ${escapeHtml(item.authorCharacter?.firstName ?? '')} ${escapeHtml(item.authorCharacter?.lastName ?? '')}
                     · ${formatDateTimeLabel(item.publishedAt)}
                   </p>
-                </div>
+                </article>
               `,
                   )
                   .join('')
@@ -173,10 +175,13 @@ function paint(root, data, { canManage, isCadet, onReload }) {
       </article>
     </section>
 
-    <section class="mt-8 grid gap-8 xl:grid-cols-2">
-      <article class="surface-card space-y-5 p-5 md:p-6">
-        <h3 class="text-sm font-semibold text-white">Próximos entrenamientos</h3>
-        <div class="space-y-4">
+    <section class="mt-6 grid gap-6 xl:grid-cols-2">
+      <article class="panel space-y-5 p-5 md:p-6">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400">Próximos</p>
+          <h3 class="mt-1 text-sm font-semibold text-white">Entrenamientos programados</h3>
+        </div>
+        <div class="space-y-3">
           ${
             upcoming.length
               ? upcoming.map((item) => renderTrainingSummary(item, { isCadet, canManage })).join('')
@@ -185,8 +190,11 @@ function paint(root, data, { canManage, isCadet, onReload }) {
         </div>
       </article>
 
-      <article class="surface-card space-y-5 p-5 md:p-6">
-        <h3 class="text-sm font-semibold text-white">Historial</h3>
+      <article class="panel space-y-5 p-5 md:p-6">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400">Registro</p>
+          <h3 class="mt-1 text-sm font-semibold text-white">Historial académico</h3>
+        </div>
         <div class="space-y-3">
           ${
             history.length
@@ -194,12 +202,15 @@ function paint(root, data, { canManage, isCadet, onReload }) {
                   .map((item) => {
                     const mine = item.myAttendance;
                     return `
-                      <a data-link href="/academy?trainingId=${item.id}" class="block rounded-xl border border-white/10 px-4 py-3 transition hover:bg-white/[0.04]">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                          <p class="font-medium text-white">${escapeHtml(item.title)}</p>
-                          <span class="text-xs text-ink-500">${isCadet ? ATTENDANCE_LABELS[mine?.status] ?? 'Sin respuesta' : STATUS_LABELS[item.status] ?? item.status}</span>
+                      <a data-link href="/academy?trainingId=${item.id}" class="record-card group">
+                        <div class="record-card-rail record-card-rail-brand"></div>
+                        <div class="record-card-body !py-3.5">
+                          <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="font-medium text-white transition group-hover:text-brand-300">${escapeHtml(item.title)}</p>
+                            <span class="text-xs text-ink-500">${isCadet ? ATTENDANCE_LABELS[mine?.status] ?? 'Sin respuesta' : STATUS_LABELS[item.status] ?? item.status}</span>
+                          </div>
+                          <p class="mt-1 text-xs text-ink-400">${formatDateTimeLabel(item.startsAt)} · ${escapeHtml(item.location)}</p>
                         </div>
-                        <p class="mt-1 text-xs text-ink-400">${formatDateTimeLabel(item.startsAt)} · ${escapeHtml(item.location)}</p>
                       </a>
                     `;
                   })
@@ -214,7 +225,7 @@ function paint(root, data, { canManage, isCadet, onReload }) {
       canManage
         ? `
       <section class="mt-8 grid gap-8 xl:grid-cols-2">
-        <article class="surface-card p-5 md:p-6">
+        <article class="panel p-5 md:p-6">
           <h3 class="text-sm font-semibold text-white">Nuevo entrenamiento</h3>
           <form id="training-form" class="mt-5 space-y-4">
             <div>
@@ -248,7 +259,7 @@ function paint(root, data, { canManage, isCadet, onReload }) {
             <button type="submit" class="btn-primary">Crear entrenamiento</button>
           </form>
         </article>
-        <article class="surface-card p-5 md:p-6">
+        <article class="panel p-5 md:p-6">
           <h3 class="text-sm font-semibold text-white">Nuevo anuncio</h3>
           <form id="announcement-form" class="mt-5 space-y-4">
             <div>
@@ -446,7 +457,7 @@ function paintTrainingDetail(root, training, { canManage, isCadet, onReload }) {
         <a data-link href="/academy" class="text-sm font-medium text-brand-300 hover:text-brand-200">← Volver a academia</a>
       </div>
 
-      <article class="surface-card p-5 md:p-8">
+      <article class="panel p-5 md:p-8">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0">
             <p class="landing-eyebrow">Entrenamiento</p>
@@ -482,7 +493,7 @@ function paintTrainingDetail(root, training, { canManage, isCadet, onReload }) {
       </article>
 
       <section class="grid gap-8 xl:grid-cols-2">
-        <article class="surface-card space-y-4 p-5 md:p-6">
+        <article class="panel space-y-4 p-5 md:p-6">
           <h3 class="text-sm font-semibold text-white">Personal de apoyo</h3>
           <div class="space-y-3">
             ${
@@ -503,7 +514,7 @@ function paintTrainingDetail(root, training, { canManage, isCadet, onReload }) {
           </div>
         </article>
 
-        <article class="surface-card space-y-4 p-5 md:p-6">
+        <article class="panel space-y-4 p-5 md:p-6">
           <h3 class="text-sm font-semibold text-white">Internos inscritos</h3>
           <p class="text-xs text-ink-500">Confirmados: ${training.confirmedCount ?? 0}${training.capacity ? ` / ${training.capacity}` : ''}</p>
           <div class="space-y-2">
@@ -530,7 +541,7 @@ function paintTrainingDetail(root, training, { canManage, isCadet, onReload }) {
       ${
         canManage
           ? `
-        <article class="surface-card p-5 md:p-6">
+        <article class="panel p-5 md:p-6">
           <h3 class="text-sm font-semibold text-white">Editar entrenamiento</h3>
           <form id="edit-training-form" class="mt-5 grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -695,33 +706,36 @@ function renderTrainingSummary(item, { isCadet, canManage }) {
   const canRespond = Boolean(item.access?.canRespondAttendance ?? isCadet);
 
   return `
-    <div class="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-          <a data-link href="/academy?trainingId=${item.id}" class="text-sm font-semibold text-white hover:text-brand-200">
-            ${escapeHtml(item.title)}
-          </a>
-          <p class="mt-1 text-xs text-ink-400">${STATUS_LABELS[item.status] ?? item.status} · ${formatDateTimeLabel(item.startsAt)}</p>
-          <p class="mt-3 text-xs text-ink-400">Instructor: ${escapeHtml(instructorName)} · ${escapeHtml(item.location)}</p>
-          ${
-            canRespond && mine
-              ? `<p class="mt-2 text-xs text-brand-200">${ATTENDANCE_LABELS[mine.status] ?? mine.status}</p>`
-              : ''
-          }
-        </div>
-        <div class="flex shrink-0 flex-col gap-3 sm:min-w-[9.5rem]">
-          <a data-link href="/academy?trainingId=${item.id}" class="btn-secondary text-center">${canManage ? 'Gestionar' : 'Ver detalle'}</a>
-          ${
-            canRespond
-              ? `
-            <button type="button" class="btn-primary" data-training="${item.id}" data-attendance="CONFIRMED">Confirmar</button>
-            <button type="button" class="btn-secondary" data-training="${item.id}" data-attendance="DECLINED">No asistir</button>
-          `
-              : ''
-          }
+    <article class="record-card">
+      <div class="record-card-rail record-card-rail-brand"></div>
+      <div class="record-card-body">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0">
+            <a data-link href="/academy?trainingId=${item.id}" class="text-sm font-semibold text-white hover:text-brand-300">
+              ${escapeHtml(item.title)}
+            </a>
+            <p class="mt-1 text-xs text-ink-400">${STATUS_LABELS[item.status] ?? item.status} · ${formatDateTimeLabel(item.startsAt)}</p>
+            <p class="mt-3 text-xs text-ink-400">Instructor: ${escapeHtml(instructorName)} · ${escapeHtml(item.location)}</p>
+            ${
+              canRespond && mine
+                ? `<p class="mt-2 text-xs text-brand-300">${ATTENDANCE_LABELS[mine.status] ?? mine.status}</p>`
+                : ''
+            }
+          </div>
+          <div class="flex shrink-0 flex-col gap-2 sm:min-w-[9.5rem]">
+            <a data-link href="/academy?trainingId=${item.id}" class="btn-secondary !py-2.5 text-center">${canManage ? 'Gestionar' : 'Ver detalle'}</a>
+            ${
+              canRespond
+                ? `
+              <button type="button" class="btn-primary !py-2.5" data-training="${item.id}" data-attendance="CONFIRMED">Confirmar</button>
+              <button type="button" class="btn-secondary !py-2.5" data-training="${item.id}" data-attendance="DECLINED">No asistir</button>
+            `
+                : ''
+            }
+          </div>
         </div>
       </div>
-    </div>
+    </article>
   `;
 }
 

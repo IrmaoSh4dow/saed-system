@@ -29,68 +29,74 @@ export function renderTrainingCalendar({
   const selectedKey = selectedDate ? dateKey(selectedDate) : null;
   const eventsByDay = groupEventsByDay(events);
   const cells = buildMonthCells(view);
-
   const selectedEvents = selectedKey ? eventsByDay.get(selectedKey) ?? [] : [];
+  const monthEventCount = events.filter((item) => {
+    const date = new Date(item.startsAt);
+    return date.getMonth() === view.getMonth() && date.getFullYear() === view.getFullYear();
+  }).length;
 
   const html = `
-    <div class="space-y-5" data-academy-calendar>
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="cal-shell" data-academy-calendar>
+      <div class="cal-toolbar">
         <div>
-          <h3 class="text-sm font-semibold text-white">Calendario de entrenamientos</h3>
-          <p class="mt-1 text-xs text-ink-500">${canManage ? 'Vista administrativa RTD' : 'Confirma tu asistencia desde el detalle del día'}</p>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-400">Agenda académica</p>
+          <h3 class="mt-1 text-lg font-semibold text-white">Calendario de entrenamientos</h3>
+          <p class="mt-1 text-xs text-ink-500">
+            ${monthEventCount} evento${monthEventCount === 1 ? '' : 's'} este mes
+            · ${canManage ? 'Vista administrativa' : 'Confirma asistencia desde el día'}
+          </p>
         </div>
-        <div class="flex items-center gap-2">
-          <button type="button" class="btn-secondary px-3 py-2" data-cal-prev aria-label="Mes anterior">‹</button>
-          <p class="min-w-[10rem] text-center text-sm font-medium text-white" data-cal-label>
+        <div class="cal-nav">
+          <button type="button" class="cal-nav-btn" data-cal-prev aria-label="Mes anterior">‹</button>
+          <p class="min-w-[10.5rem] text-center text-sm font-semibold text-white" data-cal-label>
             ${MONTHS[view.getMonth()]} ${view.getFullYear()}
           </p>
-          <button type="button" class="btn-secondary px-3 py-2" data-cal-next aria-label="Mes siguiente">›</button>
-          <button type="button" class="btn-secondary px-3 py-2 text-xs" data-cal-today>Hoy</button>
+          <button type="button" class="cal-nav-btn" data-cal-next aria-label="Mes siguiente">›</button>
+          <button type="button" class="cal-nav-btn" data-cal-today>Hoy</button>
         </div>
       </div>
 
-      <div class="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-wide text-ink-500">
-        ${WEEKDAYS.map((day) => `<div class="py-2">${day}</div>`).join('')}
+      <div class="cal-grid-head">
+        ${WEEKDAYS.map((day) => `<div class="cal-weekday">${day}</div>`).join('')}
       </div>
 
-      <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <div class="cal-grid">
         ${cells
           .map((cell) => {
             if (!cell) {
-              return `<div class="min-h-[4.5rem] rounded-xl border border-transparent sm:min-h-[5.5rem]"></div>`;
+              return `<div class="min-h-[4.75rem] rounded-2xl border border-transparent sm:min-h-[5.75rem]"></div>`;
             }
             const key = dateKey(cell);
             const dayEvents = eventsByDay.get(key) ?? [];
             const isSelected = selectedKey === key;
             const isToday = key === dateKey(new Date());
             const hasEvents = dayEvents.length > 0;
+            const classes = [
+              'cal-day',
+              isToday ? 'is-today' : '',
+              isSelected ? 'is-selected' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
 
             return `
-              <button
-                type="button"
-                data-cal-day="${key}"
-                class="group flex min-h-[4.5rem] flex-col rounded-xl border px-1.5 py-1.5 text-left transition duration-200 sm:min-h-[5.5rem] sm:px-2 sm:py-2 ${
-                  isSelected
-                    ? 'border-brand-500/40 bg-brand-500/15'
-                    : isToday
-                      ? 'border-brand-500/25 bg-white/[0.04]'
-                      : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05]'
-                }"
-              >
-                <span class="text-xs font-medium ${isToday || isSelected ? 'text-brand-200' : 'text-ink-300'}">${cell.getDate()}</span>
+              <button type="button" data-cal-day="${key}" class="${classes}">
+                <span class="cal-day-number">${cell.getDate()}</span>
                 ${
                   hasEvents
                     ? `
-                  <span class="mt-auto flex flex-wrap gap-1 pt-1">
+                  <span class="cal-day-dots">
                     ${dayEvents
                       .slice(0, 3)
-                      .map(
-                        () =>
-                          `<span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>`,
-                      )
+                      .map(() => `<span class="cal-dot"></span>`)
                       .join('')}
-                    ${dayEvents.length > 3 ? `<span class="text-[10px] text-ink-500">+${dayEvents.length - 3}</span>` : ''}
+                    ${
+                      dayEvents.length > 3
+                        ? `<span class="text-[10px] text-ink-500">+${dayEvents.length - 3}</span>`
+                        : ''
+                    }
                   </span>
+                  <span class="mt-1 hidden truncate text-[10px] text-ink-400 sm:block">${escapeHtml(dayEvents[0].title)}</span>
                 `
                     : ''
                 }
@@ -100,7 +106,7 @@ export function renderTrainingCalendar({
           .join('')}
       </div>
 
-      <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-4" data-cal-day-panel>
+      <div class="cal-day-panel" data-cal-day-panel>
         ${
           selectedKey
             ? renderDayPanel(selectedEvents, selectedKey, canManage)
@@ -113,8 +119,13 @@ export function renderTrainingCalendar({
   return { html, viewMonth: view, selectedKey };
 }
 
-export function bindTrainingCalendar(root, { events, canManage, onMonthChange, onSelectDay, initialMonth, initialSelected }) {
-  const mount = root.querySelector('[data-calendar-host]') ?? root.querySelector('[data-academy-calendar]')?.parentElement;
+export function bindTrainingCalendar(
+  root,
+  { events, canManage, onMonthChange, onSelectDay, initialMonth, initialSelected },
+) {
+  const mount =
+    root.querySelector('[data-calendar-host]') ??
+    root.querySelector('[data-academy-calendar]')?.parentElement;
   if (!mount) {
     return () => {};
   }
@@ -181,37 +192,51 @@ function renderDayPanel(events, dayKey, canManage) {
   const label = formatDayLabel(parseDateKey(dayKey));
   if (!events.length) {
     return `
-      <p class="text-sm font-medium text-white">${label}</p>
-      <p class="mt-2 text-sm text-ink-400">Sin entrenamientos este día.</p>
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-semibold text-white">${label}</p>
+          <p class="mt-1 text-sm text-ink-400">Sin entrenamientos este día.</p>
+        </div>
+      </div>
     `;
   }
 
   return `
-    <p class="text-sm font-medium text-white">${label}</p>
-    <ul class="mt-3 space-y-2">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <p class="text-sm font-semibold text-white">${label}</p>
+        <p class="mt-1 text-xs text-ink-500">${events.length} entrenamiento${events.length === 1 ? '' : 's'}</p>
+      </div>
+    </div>
+    <ul class="mt-4 space-y-2">
       ${events
         .map((item) => {
           const attendance = item.myAttendance;
           const attendanceLabel =
             attendance?.status === 'CONFIRMED'
-              ? '✔ Asistencia confirmada'
+              ? 'Asistencia confirmada'
               : attendance?.status === 'DECLINED'
-                ? '✗ No asistirá'
-                : '○ Pendiente de confirmar';
+                ? 'No asistirá'
+                : 'Pendiente de confirmar';
+          const attendanceClass =
+            attendance?.status === 'CONFIRMED'
+              ? 'text-brand-300'
+              : attendance?.status === 'DECLINED'
+                ? 'text-rose-300'
+                : 'text-amber-200';
 
           return `
             <li>
-              <a
-                data-link
-                href="/academy?trainingId=${item.id}"
-                class="block rounded-xl border border-white/10 px-3 py-3 transition hover:bg-white/[0.04]"
-              >
-                <p class="text-sm font-medium text-white">● ${escapeHtml(item.title)}</p>
-                <p class="mt-1 text-xs text-ink-400">${formatTime(item.startsAt)} · ${escapeHtml(item.location)}</p>
+              <a data-link href="/academy?trainingId=${item.id}" class="cal-event">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                  <p class="text-sm font-medium text-white">${escapeHtml(item.title)}</p>
+                  <span class="text-[11px] font-semibold uppercase tracking-wide text-brand-400">${formatTime(item.startsAt)}</span>
+                </div>
+                <p class="mt-1 text-xs text-ink-400">${escapeHtml(item.location)}</p>
                 ${
                   canManage
-                    ? `<p class="mt-1 text-xs text-brand-300">Abrir / editar entrenamiento</p>`
-                    : `<p class="mt-1 text-xs ${attendance?.status === 'CONFIRMED' ? 'text-emerald-300' : attendance?.status === 'DECLINED' ? 'text-rose-300' : 'text-amber-200'}">${attendanceLabel}</p>`
+                    ? `<p class="mt-2 text-xs text-brand-300">Abrir / editar entrenamiento</p>`
+                    : `<p class="mt-2 text-xs ${attendanceClass}">${attendanceLabel}</p>`
                 }
               </a>
             </li>

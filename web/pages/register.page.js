@@ -1,82 +1,70 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
+import { initAuthMotion } from '../components/auth/auth-motion.js';
 import { initPasswordToggles, renderPasswordField } from '../components/auth/password-field.js';
 import { renderSubmitButton, setButtonLoading } from '../components/auth/submit-button.js';
 import { renderTextField, setFieldError } from '../components/auth/text-field.js';
-import { icon } from '../components/landing/icons.js';
 import { renderAuthLayout } from '../layouts/auth.layout.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import { registerAccount } from '../services/identity.service.js';
 import { requireGuest } from '../utils/auth-guard.js';
 import { navigate } from '../utils/router.js';
-import { initScrollReveal } from '../utils/scroll-reveal.js';
 
 export function registerPage() {
   if (!requireGuest()) {
     return { html: '', afterMount: () => {} };
   }
 
-  const content = `
-    <div class="mx-auto w-full max-w-[420px]" data-reveal>
-      <div class="surface-card overflow-hidden p-7 sm:p-9">
-        <div class="mb-8 text-center">
-          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/30 bg-brand-500/10 text-brand-300">
-            ${icon('users', 'h-5 w-5')}
-          </div>
-          <h1 class="text-2xl font-semibold tracking-tight text-white">Crear cuenta</h1>
-          <p class="mt-2 text-sm leading-relaxed text-ink-300">
-            Regístrate para gestionar tus personajes y acceder al sistema.
-          </p>
-        </div>
+  const formHtml = `
+    ${renderAuthAlert({ id: 'register-alert' })}
 
-        <div class="mb-5">${renderAuthAlert({ id: 'register-alert' })}</div>
+    <form id="register-form" class="space-y-5" novalidate>
+      ${renderTextField({
+        id: 'register-username',
+        name: 'username',
+        label: 'Usuario',
+        placeholder: 'medic01',
+        autocomplete: 'username',
+        required: true,
+        hint: 'Mínimo 3 caracteres. Solo letras, números y guion bajo.',
+      })}
+      ${renderPasswordField({
+        id: 'register-password',
+        name: 'password',
+        label: 'Contraseña',
+        autocomplete: 'new-password',
+        hint: 'Usa al menos 8 caracteres.',
+      })}
+      ${renderPasswordField({
+        id: 'register-confirm',
+        name: 'confirmPassword',
+        label: 'Confirmar contraseña',
+        autocomplete: 'new-password',
+      })}
 
-        <form id="register-form" class="space-y-5" novalidate>
-          ${renderTextField({
-            id: 'register-username',
-            name: 'username',
-            label: 'Usuario',
-            placeholder: 'medic01',
-            autocomplete: 'username',
-            required: true,
-          })}
-          ${renderPasswordField({
-            id: 'register-password',
-            name: 'password',
-            label: 'Contraseña',
-            autocomplete: 'new-password',
-          })}
-          ${renderPasswordField({
-            id: 'register-confirm',
-            name: 'confirmPassword',
-            label: 'Confirmar contraseña',
-            autocomplete: 'new-password',
-          })}
-          ${renderSubmitButton({
-            id: 'register-submit',
-            label: 'Crear cuenta',
-            loadingLabel: 'Creando cuenta...',
-          })}
-        </form>
-
-        <p class="mt-7 text-center text-sm text-ink-400">
-          ¿Ya tienes cuenta?
-          <a data-link href="/auth/login" class="font-semibold text-brand-300 hover:text-brand-200">Iniciar sesión</a>
-        </p>
-      </div>
-      <p class="mt-6 text-center text-xs text-ink-500">
-        <a data-link href="/" class="transition hover:text-ink-300">Volver a la Landing</a>
-      </p>
-    </div>
+      ${renderSubmitButton({
+        id: 'register-submit',
+        label: 'Crear cuenta',
+        loadingLabel: 'Creando cuenta...',
+      })}
+    </form>
   `;
 
   return {
-    html: renderAuthLayout(content),
+    html: renderAuthLayout({
+      mode: 'register',
+      title: 'Crear cuenta',
+      subtitle: 'Regístrate para gestionar tus personajes y acceder a los módulos autorizados del SAED.',
+      formHtml,
+      switchHtml: `
+        ¿Ya tienes cuenta?
+        <a data-link href="/auth/login">Iniciar sesión</a>
+      `,
+    }),
     afterMount(root) {
       document.title = 'Crear cuenta · SAED';
       const form = root.querySelector('#register-form');
       const submitButton = root.querySelector('#register-submit');
-      const cleanups = [initScrollReveal(root), initPasswordToggles(root)];
-      root.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('is-visible'));
+      const cleanups = [initAuthMotion(root), initPasswordToggles(root)];
 
       const onSubmit = async (event) => {
         event.preventDefault();
@@ -130,7 +118,7 @@ export function registerPage() {
             type: 'success',
             message: 'Cuenta creada. Continuando...',
           });
-          await wait(250);
+          await wait(280);
           void navigate(result.path, { replace: true });
         } catch (error) {
           setAuthAlert(root, {

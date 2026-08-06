@@ -3,11 +3,21 @@ import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard
 import { getAuthState } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import { listDepartments } from '../services/departments.service.js';
+import { getPatient, searchPatients } from '../services/patients.service.js';
 import { createReport, searchReportOfficers } from '../services/reports.service.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
 import { navigate } from '../utils/router.js';
 import { resolveUploadUrl } from '../utils/media.js';
 import { PERMISSIONS } from '../utils/permissions.js';
+
+const REPORT_TYPES = [
+  { value: 'CONSULTATION', label: 'Consulta' },
+  { value: 'DIAGNOSTIC', label: 'Diagnóstico' },
+  { value: 'PROCEDURE', label: 'Procedimiento' },
+  { value: 'HOSPITALIZATION', label: 'Hospitalización' },
+  { value: 'INTERNAL', label: 'Interno' },
+  { value: 'OTHER', label: 'Otro' },
+];
 
 export function createReportPage() {
   if (!requireActiveCharacter()) {
@@ -20,18 +30,33 @@ export function createReportPage() {
 
   const { activeCharacter } = getAuthState();
   const myOfficerId = activeCharacter?.staffProfile?.id ?? null;
+  const presetPatientId = new URLSearchParams(window.location.search).get('patientId');
 
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'create-report-alert' })}
       <a data-link href="/reports" class="inline-flex text-sm font-medium text-brand-300 hover:text-brand-200">← Volver a informes</a>
 
-      <section class="surface-card p-5 md:p-8">
-        <p class="landing-eyebrow">Operaciones</p>
-        <h2 class="mt-1 text-2xl font-semibold text-white">Nuevo informe</h2>
-        <p class="mt-2 text-sm text-ink-300">Documenta investigaciones y reportes internos del departamento.</p>
+      <section class="panel p-5 md:p-8">
+        <p class="landing-eyebrow">Dominio clínico</p>
+        <h2 class="mt-1 text-2xl font-semibold text-white">Nuevo informe médico</h2>
+        <p class="mt-2 text-sm text-ink-300">
+          Todo informe pertenece a un paciente. Busca y selecciona el paciente antes de documentar.
+        </p>
 
         <form id="create-report-form" class="mt-8 space-y-6">
+          <div class="rounded-2xl border border-brand-500/20 bg-brand-500/5 p-4 md:p-5">
+            <h3 class="text-sm font-semibold text-white">1. Paciente</h3>
+            <p class="mt-1 text-xs text-ink-400">Busca por nombre, apellidos o coincidencias parciales.</p>
+            <div class="mt-4">
+              <label class="form-label" for="patient-query">Buscar paciente</label>
+              <input id="patient-query" class="form-input" placeholder="Ej. Grant Mercer..." autocomplete="off" />
+              <input type="hidden" id="report-patient-id" />
+              <div id="patient-selected" class="mt-3 hidden rounded-xl border border-brand-500/25 bg-brand-500/10 px-4 py-3"></div>
+              <div id="patient-results" class="mt-3 max-h-56 space-y-2 overflow-y-auto"></div>
+            </div>
+          </div>
+
           <div class="grid gap-4 md:grid-cols-2">
             <div class="md:col-span-2">
               <label class="form-label" for="report-title">Título</label>
@@ -40,11 +65,7 @@ export function createReportPage() {
             <div>
               <label class="form-label" for="report-type">Tipo</label>
               <select id="report-type" class="form-input" required>
-                <option value="INCIDENT">Incidente</option>
-                <option value="INVESTIGATION">Investigación</option>
-                <option value="INTERNAL">Interno</option>
-                <option value="ACTIVITY">Actividad</option>
-                <option value="OTHER">Otro</option>
+                ${REPORT_TYPES.map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}
               </select>
             </div>
             <div>
@@ -67,7 +88,7 @@ export function createReportPage() {
               </select>
             </div>
             <div>
-              <label class="form-label" for="report-date">Fecha del incidente</label>
+              <label class="form-label" for="report-date">Fecha clínica</label>
               <input id="report-date" type="date" class="form-input" />
             </div>
             <div class="md:col-span-2">
@@ -81,7 +102,7 @@ export function createReportPage() {
               </select>
             </div>
             <div class="md:col-span-2">
-              <label class="form-label" for="report-description">Descripción</label>
+              <label class="form-label" for="report-description">Descripción clínica</label>
               <textarea id="report-description" class="form-input min-h-[140px]" required maxlength="8000"></textarea>
             </div>
           </div>
@@ -100,7 +121,7 @@ export function createReportPage() {
             </div>
             <div id="lead-search-wrap" class="mt-4 hidden">
               <label class="form-label" for="lead-query">Buscar personal</label>
-              <input id="lead-query" class="form-input" placeholder="Nombre, apellido o badge..." autocomplete="off" />
+              <input id="lead-query" class="form-input" placeholder="Nombre, apellido o nº empleado..." autocomplete="off" />
               <input type="hidden" id="lead-officer-id" />
               <p id="lead-picked" class="mt-2 hidden text-sm text-brand-300"></p>
               <div id="lead-results" class="mt-2 max-h-48 space-y-2 overflow-y-auto"></div>
@@ -110,12 +131,15 @@ export function createReportPage() {
           <div class="rounded-2xl border border-white/10 p-4">
             <h3 class="text-sm font-semibold text-white">Personal involucrado</h3>
             <label class="form-label mt-3" for="involved-query">Buscar y agregar</label>
-            <input id="involved-query" class="form-input" placeholder="Nombre, apellido o badge..." autocomplete="off" />
+            <input id="involved-query" class="form-input" placeholder="Nombre, apellido o nº empleado..." autocomplete="off" />
             <div id="involved-results" class="mt-2 max-h-40 space-y-2 overflow-y-auto"></div>
             <div id="involved-chips" class="mt-3 flex flex-wrap gap-2"></div>
           </div>
 
-          <button type="submit" class="btn-primary">Crear informe</button>
+          <div class="flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">
+            <a data-link href="/reports" class="btn-secondary text-center">Cancelar</a>
+            <button type="submit" class="btn-primary">Guardar informe</button>
+          </div>
         </form>
       </section>
     </div>
@@ -133,6 +157,86 @@ export function createReportPage() {
       const involved = new Map();
       let leadTimer = null;
       let involvedTimer = null;
+      let patientTimer = null;
+
+      const selectPatient = (patient) => {
+        root.querySelector('#report-patient-id').value = patient.id;
+        const host = root.querySelector('#patient-selected');
+        host.classList.remove('hidden');
+        host.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-[11px] uppercase tracking-wide text-brand-300">Paciente seleccionado</p>
+              <p class="mt-1 text-sm font-semibold text-white">
+                HC #${patient.recordNumber} · ${escapeHtml(patient.fullName ?? `${patient.firstName} ${patient.lastName}`)}
+              </p>
+            </div>
+            <button type="button" id="clear-patient" class="btn-secondary !py-1.5 !px-3 text-xs">Cambiar</button>
+          </div>
+        `;
+        root.querySelector('#patient-results').innerHTML = '';
+        root.querySelector('#patient-query').value = '';
+        root.querySelector('#clear-patient')?.addEventListener('click', () => {
+          root.querySelector('#report-patient-id').value = '';
+          host.classList.add('hidden');
+          host.innerHTML = '';
+        });
+      };
+
+      if (presetPatientId) {
+        void getPatient(presetPatientId)
+          .then((patient) => selectPatient(patient))
+          .catch(() => {});
+      }
+
+      root.querySelector('#patient-query')?.addEventListener('input', (event) => {
+        clearTimeout(patientTimer);
+        patientTimer = setTimeout(async () => {
+          const q = event.target.value.trim();
+          const results = root.querySelector('#patient-results');
+          if (!results) return;
+          if (q.length < 2) {
+            results.innerHTML = '';
+            return;
+          }
+          try {
+            const items = await searchPatients({ q });
+            results.innerHTML = items.length
+              ? items
+                  .slice(0, 12)
+                  .map(
+                    (item) => `
+                      <button type="button" class="flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left hover:bg-white/[0.04]"
+                        data-patient-id="${escapeAttr(item.id)}"
+                        data-patient-record="${escapeAttr(item.recordNumber)}"
+                        data-patient-name="${escapeAttr(item.fullName)}">
+                        <span class="min-w-0">
+                          <span class="block truncate text-sm text-white">${escapeHtml(item.fullName)}</span>
+                          <span class="block truncate text-xs text-ink-400">
+                            HC #${item.recordNumber}${item.birthDate ? ` · ${escapeHtml(item.birthDate)}` : ''}${item.phone ? ` · ${escapeHtml(item.phone)}` : ''}
+                          </span>
+                        </span>
+                        <span class="text-xs text-brand-300">Seleccionar</span>
+                      </button>
+                    `,
+                  )
+                  .join('')
+              : `<p class="text-xs text-ink-500">Sin pacientes. <a data-link href="/patients/new" class="text-brand-300">Registrar paciente</a></p>`;
+
+            results.querySelectorAll('[data-patient-id]').forEach((button) => {
+              button.addEventListener('click', () => {
+                selectPatient({
+                  id: button.getAttribute('data-patient-id'),
+                  recordNumber: button.getAttribute('data-patient-record'),
+                  fullName: button.getAttribute('data-patient-name'),
+                });
+              });
+            });
+          } catch (error) {
+            results.innerHTML = `<p class="text-xs text-rose-300">${getApiErrorMessage(error)}</p>`;
+          }
+        }, 250);
+      });
 
       void listDepartments()
         .then((departments) => {
@@ -249,6 +353,16 @@ export function createReportPage() {
 
       root.querySelector('#create-report-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        const patientId = root.querySelector('#report-patient-id')?.value?.trim();
+        if (!patientId) {
+          setAuthAlert(root, {
+            id: 'create-report-alert',
+            type: 'error',
+            message: 'Debes seleccionar un paciente antes de guardar el informe.',
+          });
+          return;
+        }
+
         const mode = root.querySelector('input[name="lead-mode"]:checked')?.value;
         const leadStaffId =
           mode === 'other' ? root.querySelector('#lead-officer-id')?.value : null;
@@ -264,6 +378,7 @@ export function createReportPage() {
 
         try {
           const report = await createReport({
+            patientId,
             title: root.querySelector('#report-title').value.trim(),
             type: root.querySelector('#report-type').value,
             description: root.querySelector('#report-description').value.trim(),
@@ -276,7 +391,9 @@ export function createReportPage() {
             leadStaffId: mode === 'other' ? leadStaffId : undefined,
             involvedOfficerIds: [...involved.keys()],
           });
-          void navigate(`/reports?id=${report.id}`, { replace: true });
+          void navigate(`/patients?id=${patientId}`, { replace: true });
+          // Keep report id available if navigation lands on patient; detail also links from there.
+          sessionStorage.setItem('saed.lastCreatedReportId', report.id);
         } catch (error) {
           setAuthAlert(root, {
             id: 'create-report-alert',
@@ -286,7 +403,12 @@ export function createReportPage() {
         }
       });
 
-      return cleanup;
+      return () => {
+        clearTimeout(patientTimer);
+        clearTimeout(leadTimer);
+        clearTimeout(involvedTimer);
+        cleanup?.();
+      };
     },
   };
 }
@@ -297,4 +419,8 @@ function escapeHtml(value) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replaceAll("'", '&#39;');
 }

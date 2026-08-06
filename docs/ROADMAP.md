@@ -5,7 +5,7 @@
 - Estructura del proyecto.
 - Configuración de NestJS.
 - Configuración del Frontend.
-- Discord OAuth.
+- Autenticación LOCAL (usuario y contraseña).
 - Socket.IO.
 - Sistema de Roles y Permisos (RBAC).
 - Gestión de Cuentas.

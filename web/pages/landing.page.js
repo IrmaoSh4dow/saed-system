@@ -1,5 +1,5 @@
 import { renderAboutSection } from '../components/landing/about-section.js';
-import { renderBenefitsSection } from '../components/landing/benefits-section.js';
+import { renderDepartmentsSection } from '../components/landing/departments-section.js';
 import { renderFaqSection } from '../components/landing/faq-section.js';
 import { renderFinalCta } from '../components/landing/final-cta.js';
 import {
@@ -8,6 +8,7 @@ import {
 } from '../components/landing/gallery-section.js';
 import { renderHero } from '../components/landing/hero.js';
 import { renderHowItWorksSection } from '../components/landing/how-it-works.js';
+import { renderModulesSection } from '../components/landing/modules-section.js';
 import { renderNewsDetailModalHost } from '../components/landing/news-detail-modal.js';
 import {
   bindNewsSection,
@@ -19,8 +20,6 @@ import {
   paintOfficerCarousel,
   renderOfficerCarousel,
 } from '../components/landing/staff-carousel.js';
-import { renderRecruitmentSection } from '../components/landing/recruitment-section.js';
-import { renderStatsSection } from '../components/landing/stats-section.js';
 import { bindAppModal } from '../components/ui/modal.js';
 import { initLandingLayout, renderLandingLayout } from '../layouts/landing.layout.js';
 import { listActiveGallery } from '../services/gallery.service.js';
@@ -33,13 +32,12 @@ import { initFlowbite } from 'flowbite';
 export function landingPage() {
   const content = [
     renderHero(),
+    renderModulesSection(),
     renderAboutSection(),
     renderNewsSection([]),
-    renderRecruitmentSection(),
     renderOfficerCarousel([]),
+    renderDepartmentsSection(),
     renderGallerySection([]),
-    renderBenefitsSection(),
-    renderStatsSection(),
     renderHowItWorksSection(),
     renderFaqSection(),
     renderFinalCta(),
@@ -96,9 +94,7 @@ export function landingPage() {
 
       return () => {
         for (const cleanup of cleanups) {
-          if (typeof cleanup === 'function') {
-            cleanup();
-          }
+          if (typeof cleanup === 'function') cleanup();
         }
       };
     },

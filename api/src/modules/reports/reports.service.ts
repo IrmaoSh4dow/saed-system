@@ -42,7 +42,18 @@ const officerCardSelect = {
   department: { select: { id: true, name: true } },
 } as const;
 
+const patientCardSelect = {
+  id: true,
+  recordNumber: true,
+  firstName: true,
+  lastName: true,
+  middleName: true,
+  birthDate: true,
+  status: true,
+} as const;
+
 const reportInclude = {
+  patient: { select: patientCardSelect },
   department: { select: { id: true, name: true, imageUrl: true } },
   leadStaff: { select: officerCardSelect },
   createdByCharacter: {
@@ -137,6 +148,7 @@ export class ReportsService {
     return this.prismaService.report.findMany({
       where,
       include: {
+        patient: { select: patientCardSelect },
         department: { select: { id: true, name: true } },
         leadStaff: { select: officerCardSelect },
         _count: { select: { participants: true, evidence: true } },
@@ -169,6 +181,14 @@ export class ReportsService {
     const creatorOfficer = await this.getOfficerByCharacter(actor.characterId);
     if (!creatorOfficer) {
       throw new ForbiddenException('Only officers can create reports');
+    }
+
+    const patient = await this.prismaService.patient.findUnique({
+      where: { id: dto.patientId },
+      select: { id: true, recordNumber: true, firstName: true, lastName: true },
+    });
+    if (!patient) {
+      throw new BadRequestException('Patient was not found');
     }
 
     let leadStaffId = dto.leadStaffId ?? null;
@@ -215,6 +235,7 @@ export class ReportsService {
         location: dto.location?.trim() || null,
         status: dto.status ?? ReportStatus.PENDING,
         priority: dto.priority ?? ReportPriority.MEDIUM,
+        patientId: patient.id,
         departmentId,
         leadStaffId,
         createdByCharacterId: actor.characterId,
@@ -234,6 +255,7 @@ export class ReportsService {
       metadata: {
         reportNumber: report.reportNumber,
         title: report.title,
+        patientId: patient.id,
         leadStaffId,
         departmentId,
         involved,

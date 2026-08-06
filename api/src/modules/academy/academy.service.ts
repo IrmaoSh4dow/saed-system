@@ -863,26 +863,27 @@ export class AcademyService {
       throw new NotFoundException('Character was not found');
     }
     if (character.staffProfile) {
-      throw new ConflictException('Character already has an officer profile');
+      throw new ConflictException('Character already has a medical staff profile');
     }
 
-    const cadetRank =
+    const internRank =
       (dto.rankId
         ? await this.prismaService.rank.findUnique({ where: { id: dto.rankId } })
         : null) ??
-      (await this.prismaService.rank.findUnique({ where: { slug: 'cadet' } }));
+      (await this.prismaService.rank.findUnique({ where: { slug: 'intern' } }));
 
-    if (!cadetRank) {
-      throw new BadRequestException('Cadet rank is not configured');
+    if (!internRank) {
+      throw new BadRequestException('Intern rank is not configured');
     }
 
-    const cadetRole = await this.rolesService.findBySlug('cadet');
-    const employeeNumber = (dto.employeeNumber?.trim() || (await this.generateCadetBadge())).trim();
+    const internRole = await this.rolesService.findBySlug('intern');
+    const employeeNumber =
+      (dto.employeeNumber?.trim() || (await this.generateCadetBadge())).trim();
     const existingBadge = await this.prismaService.staffProfile.findUnique({
       where: { employeeNumber },
     });
     if (existingBadge) {
-      throw new ConflictException('Badge number is already in use');
+      throw new ConflictException('Employee number is already in use');
     }
 
     if (dto.departmentId) {
@@ -901,7 +902,7 @@ export class AcademyService {
         data: {
           characterId,
           employeeNumber,
-          rankId: cadetRank.id,
+          rankId: internRank.id,
           departmentId: dto.departmentId ?? null,
           status: StaffStatus.ACTIVE,
           joinedAt,
@@ -912,7 +913,7 @@ export class AcademyService {
         where: { id: characterId },
         data: {
           status: CharacterStatus.INTERN,
-          rankId: cadetRank.id,
+          rankId: internRank.id,
         },
       });
 
@@ -926,7 +927,7 @@ export class AcademyService {
           characterId,
           type: OccupationType.DEPARTMENT,
           organization: SAED_ORGANIZATION,
-          position: cadetRank.name,
+          position: internRank.name,
           isPrimary: true,
           isActive: true,
           startedAt: joinedAt,
@@ -937,13 +938,13 @@ export class AcademyService {
         where: {
           characterId_roleId: {
             characterId,
-            roleId: cadetRole.id,
+            roleId: internRole.id,
           },
         },
         update: {},
         create: {
           characterId,
-          roleId: cadetRole.id,
+          roleId: internRole.id,
         },
       });
 
@@ -953,13 +954,13 @@ export class AcademyService {
     await this.auditService.create({
       actorAccountId: actor.accountId,
       actorCharacterId: actor.characterId,
-      action: 'academy.cadet_promoted',
+      action: 'academy.intern_promoted',
       targetType: AUDIT_TARGET.OFFICER,
       targetId: officer.id,
       metadata: {
         characterId,
         employeeNumber,
-        rankId: cadetRank.id,
+        rankId: internRank.id,
         event: 'academy_accepted',
       },
     });
@@ -1022,15 +1023,15 @@ export class AcademyService {
       return;
     }
 
-    // External transfer without prior StaffProfile — create as officer
+    // External transfer without prior StaffProfile — create as doctor
     if (!rank) {
-      rank = await this.prismaService.rank.findUnique({ where: { slug: 'officer-i' } });
+      rank = await this.prismaService.rank.findUnique({ where: { slug: 'doctor' } });
     }
     if (!rank) {
       throw new BadRequestException('Target rank is required for transfer acceptance');
     }
 
-    const officerRole = await this.rolesService.findBySlug('officer');
+    const doctorRole = await this.rolesService.findBySlug('doctor');
     const employeeNumber = (dto.employeeNumber?.trim() || (await this.generateCadetBadge('T'))).trim();
     const joinedAt = new Date();
 
@@ -1070,10 +1071,10 @@ export class AcademyService {
 
       await tx.characterRole.upsert({
         where: {
-          characterId_roleId: { characterId, roleId: officerRole.id },
+          characterId_roleId: { characterId, roleId: doctorRole.id },
         },
         update: {},
-        create: { characterId, roleId: officerRole.id },
+        create: { characterId, roleId: doctorRole.id },
       });
 
       return created;
@@ -1230,7 +1231,7 @@ export class AcademyService {
     if (character.status === CharacterStatus.INTERN) {
       return true;
     }
-    return character.roles.some((item) => item.role.slug === 'cadet');
+    return character.roles.some((item) => item.role.slug === 'intern');
   }
 
   private async requireTraining(id: string) {
@@ -1274,7 +1275,7 @@ export class AcademyService {
         return candidate;
       }
     }
-    throw new BadRequestException('Could not generate a unique badge number');
+    throw new BadRequestException('Could not generate a unique employee number');
   }
 
   private async notifyCadets(
@@ -1283,21 +1284,21 @@ export class AcademyService {
     body: string,
     href: string,
   ) {
-    const cadets = await this.prismaService.character.findMany({
+    const interns = await this.prismaService.character.findMany({
       where: {
         OR: [
           { status: CharacterStatus.INTERN },
-          { roles: { some: { role: { slug: 'cadet' } } } },
+          { roles: { some: { role: { slug: 'intern' } } } },
         ],
       },
       select: { id: true, accountId: true },
     });
 
     await Promise.all(
-      cadets.map((cadet) =>
+      interns.map((intern) =>
         this.notificationsService.create({
-          accountId: cadet.accountId,
-          characterId: cadet.id,
+          accountId: intern.accountId,
+          characterId: intern.id,
           type,
           title,
           body,

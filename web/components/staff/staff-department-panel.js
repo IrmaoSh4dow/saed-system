@@ -1,4 +1,4 @@
-import { renderPrimaryDepartmentBadge } from './officer-departments-section.js';
+import { renderPrimaryDepartmentBadge } from './staff-departments-section.js';
 
 /**
  * Fixed-size primary department identity badge.

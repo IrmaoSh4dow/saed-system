@@ -50,6 +50,7 @@ export interface ICharacterResponseDto {
     id: string;
     type: string;
     organization: string;
+    establishmentId: string | null;
     position: string | null;
     isPrimary: boolean;
     isActive: boolean;
@@ -57,6 +58,7 @@ export interface ICharacterResponseDto {
   primaryOccupation: {
     type: string;
     organization: string;
+    establishmentId: string | null;
     position: string | null;
   } | null;
   staffProfile: {
@@ -123,6 +125,7 @@ export function toCharacterResponseDto(
       id: item.id,
       type: item.type,
       organization: item.organization,
+      establishmentId: item.establishmentId ?? null,
       position: item.position,
       isPrimary: item.isPrimary,
       isActive: item.isActive,
@@ -171,6 +174,7 @@ export function toCharacterResponseDto(
       ? {
           type: primaryOccupation.type,
           organization: primaryOccupation.organization,
+          establishmentId: primaryOccupation.establishmentId,
           position: primaryOccupation.position,
         }
       : null,

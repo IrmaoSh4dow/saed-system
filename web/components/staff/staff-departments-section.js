@@ -15,7 +15,7 @@ export function renderStaffDepartmentsSection(officer, options = {}) {
     resolveStaffDepartments(officer);
 
   return `
-    <section class="surface-card p-6 ${className}">
+    <section class="panel p-6 ${className}">
       <div class="grid gap-8 ${showBadge ? 'lg:grid-cols-[auto_1fr]' : ''}">
         ${
           showBadge

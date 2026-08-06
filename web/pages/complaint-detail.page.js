@@ -10,7 +10,7 @@ import {
   sendComplaintMessage,
   updateComplaintStatus,
 } from '../services/complaints.service.js';
-import { connectSocket, getSocket } from '../services/socket-client.js';
+import { subscribeCaseRoom } from '../services/room-subscription.js';
 import { formatDateLabel, formatDateTimeLabel } from '../utils/date.js';
 import { requireActiveCharacter } from '../utils/auth-guard.js';
 import { getApiBaseUrl } from '../utils/env.js';
@@ -36,19 +36,19 @@ export function complaintDetailPage(complaintId) {
       ${renderAuthAlert({ id: 'complaint-detail-alert' })}
       <a data-link href="/complaints" class="inline-flex text-sm font-medium text-brand-300 hover:text-brand-200">← Volver al listado</a>
       <div id="complaint-detail-root">
-        <p class="text-sm text-ink-400">Cargando denuncia...</p>
+        <p class="text-sm text-ink-400">Cargando queja...</p>
       </div>
     </div>
   `;
 
   return {
     html: renderDashboardLayout(content, {
-      title: 'Denuncia',
+      title: 'Queja',
       currentPath: '/complaints',
     }),
     afterMount(root) {
       const cleanupLayout = initDashboardLayout(root);
-      document.title = 'Denuncia · SAED';
+      document.title = 'Queja · SAED';
       const { activeCharacter } = getAuthState();
       let socketCleanup = null;
 
@@ -90,7 +90,7 @@ function renderDetail(root, complaint, activeCharacter) {
 
   host.innerHTML = `
     <div class="space-y-6">
-    <section class="surface-card p-5 md:p-6 lg:p-8">
+    <section class="panel p-5 md:p-6 lg:p-8">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0 flex-1">
           <p class="landing-eyebrow">Caso #${complaint.caseNumber}</p>
@@ -107,13 +107,13 @@ function renderDetail(root, complaint, activeCharacter) {
       <dl class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         ${metaCard('Lugar', complaint.location ?? '—')}
         ${metaCard('Incidente', formatDateLabel(complaint.incidentDate))}
-        ${metaCard('Denunciante', `${complaint.complainant.firstName} ${complaint.complainant.lastName}`)}
+        ${metaCard('Quejoso', `${complaint.complainant.firstName} ${complaint.complainant.lastName}`)}
         ${metaCard('Personal', officer ? `${officer.character.firstName} ${officer.character.lastName} · ${officer.employeeNumber}` : '—')}
       </dl>
     </section>
 
     <section class="grid gap-6 xl:grid-cols-12 xl:items-start">
-      <article class="complaint-chat-panel surface-card flex h-[min(70vh,40rem)] min-h-[28rem] flex-col overflow-hidden p-0 xl:col-span-7">
+      <article class="complaint-chat-panel panel flex h-[min(70vh,40rem)] min-h-[28rem] flex-col overflow-hidden p-0 xl:col-span-7">
         <div class="shrink-0 border-b border-white/10 px-5 py-4">
           <h3 class="text-sm font-semibold text-white">Chat</h3>
           <p class="mt-1 text-xs text-ink-500">Sala complaint-${complaint.caseNumber}</p>
@@ -152,7 +152,7 @@ function renderDetail(root, complaint, activeCharacter) {
       </article>
 
       <aside class="complaint-side-panel space-y-5 xl:col-span-5 xl:sticky xl:top-6 xl:max-h-[min(70vh,40rem)] xl:overflow-y-auto xl:pr-1">
-        <article class="surface-card p-5">
+        <article class="panel p-5">
           <h3 class="text-sm font-semibold text-white">Evidencias</h3>
           <div class="mt-4 space-y-3">
             ${
@@ -182,7 +182,7 @@ function renderDetail(root, complaint, activeCharacter) {
           </div>
         </article>
 
-        <article class="surface-card p-5">
+        <article class="panel p-5">
           <h3 class="text-sm font-semibold text-white">Historial</h3>
           <ul class="mt-4 max-h-44 space-y-2 overflow-y-auto">
             ${
@@ -205,7 +205,7 @@ function renderDetail(root, complaint, activeCharacter) {
         ${
           canManage
             ? `
-          <article class="surface-card p-5">
+          <article class="panel p-5">
             <h3 class="text-sm font-semibold text-white">Gestión</h3>
             <form id="complaint-status-form" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <div class="min-w-0 flex-1">
@@ -240,7 +240,7 @@ function renderDetail(root, complaint, activeCharacter) {
         ${
           canSeeInternal
             ? `
-          <article class="surface-card p-5">
+          <article class="panel p-5">
             <h3 class="text-sm font-semibold text-white">Notas internas</h3>
             <p class="mt-1 text-xs text-ink-500">Solo visibles para Chief / Internal Affairs / investigadores.</p>
             <div class="mt-4 max-h-40 space-y-3 overflow-y-auto">
@@ -461,28 +461,24 @@ function bindActions(root, complaint, activeCharacter, reload) {
 }
 
 function bindSocket(complaint, reload) {
-  const socket = connectSocket() ?? getSocket();
-  if (!socket) {
-    return () => {};
-  }
-
   const room = complaint.room ?? `complaint-${complaint.caseNumber}`;
-  socket.emit('complaints:join', { room, caseNumber: complaint.caseNumber });
-
-  const onUpdate = () => {
-    void reload();
-  };
-
-  socket.on('complaints:message', onUpdate);
-  socket.on('complaints:updated', onUpdate);
-  socket.on('complaints:note', onUpdate);
-
-  return () => {
-    socket.emit('complaints:leave', { room, caseNumber: complaint.caseNumber });
-    socket.off('complaints:message', onUpdate);
-    socket.off('complaints:updated', onUpdate);
-    socket.off('complaints:note', onUpdate);
-  };
+  return subscribeCaseRoom({
+    joinEvent: 'complaints:join',
+    leaveEvent: 'complaints:leave',
+    joinPayload: { room, caseNumber: complaint.caseNumber },
+    events: {
+      'complaints:message': (payload) => {
+        if (payload?.complaintId && payload.complaintId !== complaint.id) return;
+        void reload();
+      },
+      'complaints:updated': () => {
+        void reload();
+      },
+      'complaints:note': () => {
+        void reload();
+      },
+    },
+  });
 }
 
 function metaCard(label, value) {

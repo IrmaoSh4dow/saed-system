@@ -3,11 +3,13 @@ import {
   AuthProvider,
   CharacterSex,
   CharacterStatus,
+  EstablishmentStatus,
   OccupationType,
   StaffStatus,
   PrismaClient,
 } from '@prisma/client';
 import { hash } from '@node-rs/argon2';
+import { DEFAULT_ESTABLISHMENT_SEED } from '../src/common/constants/workplaces';
 
 const prisma = new PrismaClient();
 
@@ -38,29 +40,18 @@ type BootstrapStaffAccount = {
   sex: CharacterSex;
 };
 
+const BASE_USERNAME = 'sh4dow';
+
 const BOOTSTRAP_STAFF_ACCOUNTS: readonly BootstrapStaffAccount[] = [
   {
-    username: 'rapempireofficial',
-    legacyEmail: 'rapempireofficial@gmail.com',
+    username: 'Sh4dow',
     password: 'Sh4dow012301**',
-    displayName: 'Admin Support',
-    firstName: 'Admin',
-    lastName: 'Support',
+    displayName: 'Grant Mercer',
+    firstName: 'Grant',
+    lastName: 'Mercer',
     roleSlug: 'administrator',
     rankSlug: 'administrator',
-    employeeNumber: 'ADMIN-001',
-    sex: CharacterSex.MALE,
-  },
-  {
-    username: 'adri',
-    legacyEmail: 'adri@gmail.com',
-    password: 'adri123',
-    displayName: 'Hunter Knox',
-    firstName: 'Hunter',
-    lastName: 'Knox',
-    roleSlug: 'medical-director',
-    rankSlug: 'medical-director',
-    employeeNumber: 'DIR-001',
+    employeeNumber: 'SAED-001',
     sex: CharacterSex.MALE,
   },
 ];
@@ -139,22 +130,39 @@ const PERMISSIONS = [
   { key: 'staff.update', description: 'Edit staff rank, department and status' },
   { key: 'staff.identity', description: 'Edit staff employee number and callsign' },
   { key: 'staff.delete', description: 'Retire / remove staff profiles' },
+  { key: 'staff.manage', description: 'Full medical staff management' },
   { key: 'accounts.manage', description: 'Manage system accounts (Administrator only)' },
   { key: 'departments.read', description: 'View departments' },
   { key: 'departments.create', description: 'Create departments' },
   { key: 'departments.update', description: 'Update departments' },
+  { key: 'departments.manage', description: 'Full department administration' },
   { key: 'admin.access', description: 'Access administrative section' },
-  { key: 'reports.read', description: 'View reports' },
-  { key: 'reports.create', description: 'Create reports' },
-  { key: 'reports.update', description: 'Update reports' },
-  { key: 'reports.approve', description: 'Approve reports' },
-  { key: 'reports.transfer', description: 'Transfer reports between departments' },
-  { key: 'patients.read', description: 'View patient records' },
-  { key: 'patients.update', description: 'Update patient records' },
-  { key: 'complaints.read', description: 'View complaints' },
-  { key: 'complaints.create', description: 'Create complaints' },
+  { key: 'reports.read', description: 'View medical reports' },
+  { key: 'reports.create', description: 'Create medical reports' },
+  { key: 'reports.update', description: 'Update medical reports' },
+  { key: 'reports.approve', description: 'Approve medical reports' },
+  { key: 'reports.transfer', description: 'Transfer medical reports between departments' },
+  { key: 'medical-reports.read', description: 'View medical reports (alias domain key)' },
+  { key: 'medical-reports.create', description: 'Create medical reports (alias domain key)' },
+  { key: 'medical-reports.update', description: 'Update medical reports (alias domain key)' },
+  { key: 'medical-records.create', description: 'Create medical records' },
+  { key: 'medical-records.update', description: 'Update medical records' },
+  { key: 'medical-records.read', description: 'View medical records' },
+  { key: 'patients.read', description: 'View clinical patient registry' },
+  { key: 'patients.create', description: 'Register clinical patients' },
+  { key: 'patients.update', description: 'Update clinical patient records' },
+  { key: 'complaints.read', description: 'View institutional complaints (High Command)' },
+  { key: 'complaints.create', description: 'Create institutional complaints (High Command)' },
   { key: 'complaints.manage', description: 'Manage complaints (Medical Director)' },
-  { key: 'complaints.assign', description: 'Assign complaint investigators' },
+  { key: 'complaints.assign', description: 'Assign complaint investigators (High Command)' },
+  { key: 'appointments.read', description: 'View appointments' },
+  { key: 'appointments.create', description: 'Create appointments' },
+  { key: 'appointments.manage', description: 'Manage appointments (Medical Director)' },
+  { key: 'appointments.assign', description: 'Assign staff to appointments' },
+  { key: 'admin-requests.read', description: 'View administrative requests (High Command)' },
+  { key: 'admin-requests.create', description: 'Create administrative requests (High Command)' },
+  { key: 'admin-requests.manage', description: 'Manage administrative requests (High Command)' },
+  { key: 'admin-requests.assign', description: 'Assign administrative requests (High Command)' },
   { key: 'decorations.read', description: 'View decorations' },
   { key: 'decorations.manage', description: 'Manage decorations catalog and awards' },
   { key: 'licenses.read', description: 'View staff medical licenses and certifications' },
@@ -163,10 +171,52 @@ const PERMISSIONS = [
   { key: 'academy.manage', description: 'Manage academy trainings and announcements' },
   { key: 'academy.apply', description: 'Submit academy or transfer applications' },
   { key: 'academy.applications', description: 'Review academy applications' },
+  { key: 'agreements.read', description: 'View institutional business agreements' },
+  { key: 'agreements.manage', description: 'Manage institutional business agreements' },
+  { key: 'establishments.read', description: 'View establishments catalog (admin)' },
+  { key: 'establishments.create', description: 'Create establishments' },
+  { key: 'establishments.update', description: 'Update establishments' },
+  { key: 'establishments.delete', description: 'Delete or archive establishments' },
+  { key: 'establishments.manage', description: 'Full establishments administration' },
+  { key: 'psychotechnical-evaluations.read', description: 'View psychotechnical evaluations' },
+  { key: 'psychotechnical-evaluations.create', description: 'Register psychotechnical evaluations' },
+  { key: 'psychotechnical-evaluations.update', description: 'Update psychotechnical evaluations' },
+  { key: 'psychotechnical-evaluations.manage', description: 'Manage psychotechnical evaluations' },
+  { key: 'medical-leaves.read', description: 'View medical leaves' },
+  { key: 'medical-leaves.create', description: 'Register medical leaves' },
+  { key: 'medical-leaves.update', description: 'Update medical leaves' },
+  { key: 'medical-leaves.manage', description: 'Manage medical leaves' },
+  { key: 'occupational-health.read', description: 'View LSPD occupational fitness dashboard (High Command)' },
+  { key: 'occupational-health.interop', description: 'LSPD interop directory (redacted fitness data)' },
+  { key: 'lspd.finance.read', description: 'View LSPD institutional billing summary' },
+  { key: 'medical-record-access.read', description: 'View medical record access requests' },
+  { key: 'medical-record-access.request', description: 'Request temporary clinical record access' },
+  { key: 'medical-record-access.review', description: 'Approve or reject medical record access requests' },
+  { key: 'staff-ratings.create', description: 'Submit medical staff ratings after completed appointments' },
+  { key: 'staff-ratings.read', description: 'View medical staff ratings (High Command only)' },
+  { key: 'staff-ratings.dashboard', description: 'View hospital-wide ratings analytics' },
+  { key: 'shifts.read', description: 'View own duty shifts and statistics' },
+  { key: 'shifts.clock', description: 'Clock in and out of duty' },
+  { key: 'shifts.manage', description: 'Manage duty shifts across staff' },
+  { key: 'incentives.read', description: 'View institutional incentives module' },
+  { key: 'incentives.manage', description: 'Manage institutional incentives administration' },
+  { key: 'incentives.pay', description: 'Register incentive payments to staff' },
+  { key: 'incentives.configuration', description: 'Configure incentive amounts per rank' },
   { key: 'news.manage', description: 'Manage landing page news CMS' },
   { key: 'gallery.manage', description: 'Manage landing page gallery CMS' },
   { key: 'audit.read', description: 'Read administrative audit logs' },
 ] as const;
+
+const DEFAULT_INCENTIVE_AMOUNTS: Record<string, number> = {
+  intern: 2500,
+  resident: 5000,
+  doctor: 8000,
+  specialist: 10000,
+  'department-chief': 15000,
+  'deputy-medical-director': 20000,
+  'medical-director': 25000,
+  administrator: 25000,
+};
 
 const CIVILIAN_CORE = [
   'characters.read',
@@ -177,8 +227,9 @@ const CIVILIAN_CORE = [
   'dashboard.read',
   'profile.read',
   'settings.read',
-  'complaints.read',
-  'complaints.create',
+  'staff-ratings.create',
+  'appointments.read',
+  'appointments.create',
 ] as const;
 
 const CIVILIAN_BASE = [...CIVILIAN_CORE, 'academy.apply'] as const;
@@ -189,16 +240,35 @@ const INTERN_BASE = [
   'departments.read',
   'reports.read',
   'reports.create',
+  'medical-reports.read',
+  'medical-reports.create',
+  'patients.read',
+  'patients.create',
   'academy.read',
+  'shifts.read',
+  'shifts.clock',
+  'agreements.read',
+  'psychotechnical-evaluations.read',
+  'medical-leaves.read',
 ] as const;
 
-const RESIDENT_BASE = [...INTERN_BASE, 'reports.update'] as const;
+const RESIDENT_BASE = [
+  ...INTERN_BASE,
+  'reports.update',
+  'medical-reports.update',
+  'medical-records.read',
+] as const;
 
 const DOCTOR_BASE = [
   ...RESIDENT_BASE,
-  'patients.read',
   'patients.update',
   'reports.approve',
+  'medical-records.create',
+  'medical-records.update',
+  'psychotechnical-evaluations.create',
+  'psychotechnical-evaluations.update',
+  'medical-leaves.create',
+  'medical-leaves.update',
 ] as const;
 
 const SPECIALIST_BASE = [...DOCTOR_BASE, 'departments.update'] as const;
@@ -206,34 +276,81 @@ const SPECIALIST_BASE = [...DOCTOR_BASE, 'departments.update'] as const;
 const DEPARTMENT_CHIEF_BASE = [
   ...SPECIALIST_BASE,
   'staff.update',
+  'staff.manage',
   'reports.transfer',
   'departments.create',
+  'departments.manage',
   'academy.manage',
   'decorations.read',
   'licenses.read',
+  'shifts.manage',
+  'agreements.manage',
 ] as const;
 
-const MEDICAL_DIRECTOR_BASE = [
+const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   ...DEPARTMENT_CHIEF_BASE,
   'staff.create',
-  'staff.delete',
   'staff.identity',
   'characters.search',
   'ranks.read',
+  'occupations.read',
+  'admin.access',
+  'audit.read',
+  // Quejas / Solicitudes / LSPD — High Command and above only
+  'complaints.read',
+  'complaints.create',
+  'complaints.assign',
+  'admin-requests.read',
+  'admin-requests.create',
+  'admin-requests.assign',
+  'admin-requests.manage',
+  'occupational-health.read',
+  'appointments.assign',
+  'academy.applications',
+  'incentives.read',
+  'incentives.manage',
+  'incentives.pay',
+  'incentives.configuration',
+  'establishments.read',
+  'establishments.create',
+  'establishments.update',
+  'establishments.delete',
+  'establishments.manage',
+  'psychotechnical-evaluations.manage',
+  'medical-leaves.manage',
+  'lspd.finance.read',
+  'medical-record-access.read',
+  'medical-record-access.review',
+  'staff-ratings.read',
+  'staff-ratings.dashboard',
+] as const;
+
+const MEDICAL_DIRECTOR_BASE = [
+  ...DEPUTY_MEDICAL_DIRECTOR_BASE,
+  'staff.delete',
   'ranks.create',
   'ranks.update',
   'ranks.delete',
-  'occupations.read',
   'occupations.manage',
-  'admin.access',
-  'audit.read',
   'complaints.manage',
-  'complaints.assign',
+  'appointments.manage',
   'decorations.manage',
   'licenses.manage',
-  'academy.applications',
   'news.manage',
   'gallery.manage',
+] as const;
+
+/** External agency interop — redacted occupational fitness only (no clinical chart). */
+const LSPD_MEDICAL_SUPERVISOR_PERMISSIONS = [
+  'auth.session',
+  'dashboard.read',
+  'profile.read',
+  'settings.read',
+  'characters.read',
+  'characters.switch',
+  'occupational-health.interop',
+  'medical-record-access.read',
+  'medical-record-access.request',
 ] as const;
 
 const ROLES = [
@@ -274,6 +391,12 @@ const ROLES = [
     permissions: [...DEPARTMENT_CHIEF_BASE],
   },
   {
+    name: 'Deputy Medical Director',
+    slug: 'deputy-medical-director',
+    description: 'SAED deputy medical director',
+    permissions: [...DEPUTY_MEDICAL_DIRECTOR_BASE],
+  },
+  {
     name: 'Medical Director',
     slug: 'medical-director',
     description: 'SAED medical director (high command)',
@@ -284,6 +407,13 @@ const ROLES = [
     slug: 'administrator',
     description: 'System administrator',
     permissions: ['*'],
+  },
+  {
+    name: 'LSPD Medical Supervisor',
+    slug: 'lspd-medical-supervisor',
+    description:
+      'External LSPD interoperability role — occupational fitness only (no clinical chart access)',
+    permissions: [...LSPD_MEDICAL_SUPERVISOR_PERMISSIONS],
   },
 ] as const;
 
@@ -298,6 +428,12 @@ const RANKS = [
     slug: 'department-chief',
     description: 'Department chief',
     sortOrder: 50,
+  },
+  {
+    name: 'Subdirector Médico',
+    slug: 'deputy-medical-director',
+    description: 'Deputy medical director',
+    sortOrder: 55,
   },
   {
     name: 'Director Médico',
@@ -440,6 +576,22 @@ async function seed(): Promise<void> {
     });
   }
 
+  const incentiveRanks = await prisma.rank.findMany({
+    where: { slug: { not: 'citizen' }, isActive: true },
+  });
+  for (const rank of incentiveRanks) {
+    const amount = DEFAULT_INCENTIVE_AMOUNTS[rank.slug] ?? 0;
+    await prisma.incentiveConfiguration.upsert({
+      where: { rankId: rank.id },
+      update: {},
+      create: {
+        rankId: rank.id,
+        amount,
+        isActive: true,
+      },
+    });
+  }
+
   for (const department of DEPARTMENTS) {
     await prisma.department.upsert({
       where: { slug: department.slug },
@@ -461,6 +613,43 @@ async function seed(): Promise<void> {
     await prisma.department.updateMany({
       where: { slug },
       data: { isActive: false },
+    });
+  }
+
+  for (const establishment of DEFAULT_ESTABLISHMENT_SEED) {
+    const isSelectable = establishment.isSelectable ?? true;
+    await prisma.establishment.upsert({
+      where: { slug: establishment.slug },
+      update: {
+        name: establishment.name,
+        defaultPosition: establishment.defaultPosition,
+        occupationType: establishment.type,
+        sortOrder: establishment.sortOrder,
+        status: EstablishmentStatus.ACTIVE,
+        isSelectable,
+      },
+      create: {
+        slug: establishment.slug,
+        name: establishment.name,
+        defaultPosition: establishment.defaultPosition,
+        occupationType: establishment.type,
+        sortOrder: establishment.sortOrder,
+        status: EstablishmentStatus.ACTIVE,
+        isSelectable,
+      },
+    });
+  }
+
+  const establishments = await prisma.establishment.findMany({
+    select: { id: true, name: true },
+  });
+  for (const establishment of establishments) {
+    await prisma.occupation.updateMany({
+      where: {
+        establishmentId: null,
+        organization: { equals: establishment.name, mode: 'insensitive' },
+      },
+      data: { establishmentId: establishment.id },
     });
   }
 
@@ -492,7 +681,52 @@ async function seed(): Promise<void> {
     await upsertBootstrapStaffAccount(bootstrap);
   }
 
+  await removeNonBaseAccounts();
+  await seedTreatments();
+
   console.log('Identity + administrative seed completed');
+}
+
+const DEFAULT_TREATMENTS = [
+  { name: 'Consulta médica general', price: 150, sortOrder: 10 },
+  { name: 'Curación / sutura menor', price: 250, sortOrder: 20 },
+  { name: 'Radiografía', price: 300, sortOrder: 30 },
+  { name: 'Analítica de sangre', price: 200, sortOrder: 40 },
+  { name: 'Ecografía', price: 350, sortOrder: 50 },
+  { name: 'Psicotécnico civil', price: 400, sortOrder: 60 },
+  { name: 'Psicotécnico LSPD', price: 500, sortOrder: 70 },
+  { name: 'Hospitalización (día)', price: 800, sortOrder: 80 },
+  { name: 'Cirugía menor', price: 1500, sortOrder: 90 },
+  { name: 'Tratamiento de urgencias', price: 600, sortOrder: 100 },
+] as const;
+
+async function seedTreatments(): Promise<void> {
+  for (const treatment of DEFAULT_TREATMENTS) {
+    await prisma.treatment.upsert({
+      where: { name: treatment.name },
+      update: {
+        price: treatment.price,
+        isActive: true,
+        sortOrder: treatment.sortOrder,
+      },
+      create: {
+        name: treatment.name,
+        price: treatment.price,
+        isActive: true,
+        sortOrder: treatment.sortOrder,
+      },
+    });
+  }
+}
+
+async function removeNonBaseAccounts(): Promise<void> {
+  const removed = await prisma.account.deleteMany({
+    where: {
+      username: { not: BASE_USERNAME },
+    },
+  });
+
+  console.log(`Removed ${removed.count} non-base account(s); kept @${BASE_USERNAME}`);
 }
 
 async function upsertBootstrapStaffAccount(

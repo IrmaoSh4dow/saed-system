@@ -209,9 +209,7 @@ JWT
 
 Arquitectura multi-proveedor de autenticación
 
-Discord OAuth2
-
-Proveedor LOCAL (usuario/correo + contraseña con Argon2)
+Proveedor LOCAL (usuario y contraseña con Argon2)
 
 ---
 
@@ -1500,7 +1498,7 @@ Las siguientes decisiones forman parte de la arquitectura oficial del proyecto.
 
 ✓ Arquitectura multi-proveedor de autenticación.
 
-✓ Discord OAuth2 como proveedor inicial.
+✓ Autenticación LOCAL (usuario y contraseña) como proveedor inicial.
 
 ✓ Proveedor LOCAL (usuario/correo + contraseña con Argon2).
 

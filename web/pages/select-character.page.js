@@ -1,7 +1,8 @@
-import { renderCharacterCard } from '../components/characters/character-card.js';
-import { icon } from '../components/landing/icons.js';
-import { MAX_CHARACTERS_PER_ACCOUNT } from '../config/characters.js';
-import { renderAuthLayout } from '../layouts/auth.layout.js';
+import {
+  buildCharacterSlides,
+  paintCharacterSelectStage,
+  renderCharacterSelectStage,
+} from '../components/characters/character-select-stage.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import {
   getCurrentCharacters,
@@ -10,110 +11,171 @@ import {
 } from '../services/identity.service.js';
 import { requireAuth } from '../utils/auth-guard.js';
 import { navigate } from '../utils/router.js';
-import { initScrollReveal } from '../utils/scroll-reveal.js';
 
 export function selectCharacterPage() {
   if (!requireAuth()) {
     return { html: '', afterMount: () => {} };
   }
 
-  const content = `
-    <div class="mx-auto w-full max-w-6xl" data-reveal>
-      <div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="landing-eyebrow">Sesión</p>
-          <h1 class="text-3xl font-semibold tracking-tight text-white">Seleccionar personaje</h1>
-          <p class="mt-3 max-w-xl text-sm leading-relaxed text-ink-300">
-            Elige la identidad con la que accederás al sistema. Máximo ${MAX_CHARACTERS_PER_ACCOUNT} personajes por cuenta.
-          </p>
-        </div>
-        <a
-          data-link
-          href="/characters/create"
-          id="create-character-link"
-          class="btn-secondary shrink-0 self-start sm:self-auto"
-        >
-          ${icon('users', 'h-4 w-4')}
-          Nuevo personaje
-        </a>
-      </div>
-
-      <div id="character-select-status" class="mb-4 text-sm text-ink-400">Cargando personajes...</div>
-      <div id="character-select-grid" class="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3"></div>
-    </div>
-  `;
-
   return {
-    html: renderAuthLayout(content, { contentAlign: 'start' }),
+    html: `
+      <div id="character-select-root" class="relative min-h-screen overflow-hidden bg-surface-950 text-ink-100">
+        <div class="flex min-h-screen items-center justify-center px-6">
+          <p id="character-select-status" class="text-sm text-ink-400">Preparando identidades...</p>
+        </div>
+      </div>
+    `,
     afterMount(root) {
       document.title = 'Seleccionar personaje · SAED';
-      const cleanups = [initScrollReveal(root)];
-      root.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('is-visible'));
-
+      const host = root.querySelector('#character-select-root') ?? root;
       const status = root.querySelector('#character-select-status');
-      const grid = root.querySelector('#character-select-grid');
-      const createLink = root.querySelector('#create-character-link');
+      const cleanups = [];
+      let slides = [];
+      let activeIndex = 0;
+      let selecting = false;
 
-      const renderList = (characters) => {
-        if (!characters.length) {
-          void navigate('/characters/create', { replace: true });
-          return;
-        }
-
-        if (createLink) {
-          createLink.classList.toggle('hidden', characters.length >= MAX_CHARACTERS_PER_ACCOUNT);
-        }
-
-        if (status) {
-          status.textContent = '';
-        }
-
-        if (grid) {
-          grid.innerHTML = characters.map((character) => renderCharacterCard(character)).join('');
-        }
+      const render = () => {
+        host.innerHTML = renderCharacterSelectStage(slides, activeIndex);
+        bindStage();
       };
 
-      const bootstrapList = async () => {
+      const setIndex = (nextIndex) => {
+        if (!slides.length) return;
+        const bounded = ((nextIndex % slides.length) + slides.length) % slides.length;
+        if (bounded === activeIndex) return;
+        activeIndex = bounded;
+        paintCharacterSelectStage(host, slides, activeIndex);
+        bindStage();
+      };
+
+      const bindStage = () => {
+        cleanups.splice(0).forEach((fn) => fn?.());
+
+        const onPrev = () => setIndex(activeIndex - 1);
+        const onNext = () => setIndex(activeIndex + 1);
+        const prev = host.querySelector('#cs-prev');
+        const next = host.querySelector('#cs-next');
+        prev?.addEventListener('click', onPrev);
+        next?.addEventListener('click', onNext);
+        cleanups.push(() => prev?.removeEventListener('click', onPrev));
+        cleanups.push(() => next?.removeEventListener('click', onNext));
+
+        const onDot = (event) => {
+          const button = event.target.closest('[data-cs-dot]');
+          if (!button) return;
+          setIndex(Number(button.getAttribute('data-cs-dot')));
+        };
+        host.addEventListener('click', onDot);
+        cleanups.push(() => host.removeEventListener('click', onDot));
+
+        const onSlideClick = (event) => {
+          const slide = event.target.closest('[data-cs-index]');
+          if (!slide) return;
+          const index = Number(slide.getAttribute('data-cs-index'));
+          if (Number.isNaN(index)) return;
+          if (index !== activeIndex) {
+            setIndex(index);
+            return;
+          }
+          if (slide.getAttribute('data-cs-type') === 'create') {
+            void navigate('/characters/create');
+          }
+        };
+        host.addEventListener('click', onSlideClick);
+        cleanups.push(() => host.removeEventListener('click', onSlideClick));
+
+        const onKeyDown = (event) => {
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            setIndex(activeIndex - 1);
+          }
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            setIndex(activeIndex + 1);
+          }
+          if (event.key === 'Enter') {
+            const slide = slides[activeIndex];
+            if (slide?.type === 'create') {
+              void navigate('/characters/create');
+            }
+          }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        cleanups.push(() => window.removeEventListener('keydown', onKeyDown));
+
+        let touchStartX = 0;
+        const onTouchStart = (event) => {
+          touchStartX = event.changedTouches?.[0]?.clientX ?? 0;
+        };
+        const onTouchEnd = (event) => {
+          const endX = event.changedTouches?.[0]?.clientX ?? 0;
+          const delta = endX - touchStartX;
+          if (Math.abs(delta) < 40) return;
+          if (delta > 0) setIndex(activeIndex - 1);
+          else setIndex(activeIndex + 1);
+        };
+        host.addEventListener('touchstart', onTouchStart, { passive: true });
+        host.addEventListener('touchend', onTouchEnd, { passive: true });
+        cleanups.push(() => host.removeEventListener('touchstart', onTouchStart));
+        cleanups.push(() => host.removeEventListener('touchend', onTouchEnd));
+      };
+
+      const bootstrap = async () => {
         try {
           const cached = getCurrentCharacters();
           if (cached.length) {
-            renderList(cached);
+            slides = buildCharacterSlides(cached);
+            activeIndex = 0;
+            render();
           }
 
           const characters = await loadCharacters();
-          renderList(characters);
+          if (!characters.length) {
+            void navigate('/characters/create', { replace: true });
+            return;
+          }
+
+          slides = buildCharacterSlides(characters);
+          activeIndex = 0;
+          render();
         } catch (error) {
           if (status) {
             status.textContent = getApiErrorMessage(error, 'No se pudieron cargar los personajes.');
+          } else {
+            host.innerHTML = `<div class="flex min-h-screen items-center justify-center px-6"><p class="text-sm text-rose-300">${getApiErrorMessage(error, 'No se pudieron cargar los personajes.')}</p></div>`;
           }
         }
       };
 
-      const onClick = async (event) => {
+      const onSelect = async (event) => {
         const button = event.target.closest('[data-select-character]');
-        if (!button) {
-          return;
-        }
-
+        if (!button || selecting) return;
+        selecting = true;
         button.disabled = true;
         const characterId = button.getAttribute('data-select-character');
-
         try {
           await switchActiveCharacter(characterId);
           void navigate('/dashboard', { replace: true });
         } catch (error) {
+          selecting = false;
           button.disabled = false;
-          if (status) {
-            status.textContent = getApiErrorMessage(error, 'No se pudo seleccionar el personaje.');
+          const panel = host.querySelector('#cs-detail-panel');
+          if (panel) {
+            const alert = document.createElement('p');
+            alert.className = 'mt-3 text-sm text-rose-300';
+            alert.textContent = getApiErrorMessage(error, 'No se pudo seleccionar el personaje.');
+            panel.appendChild(alert);
           }
         }
       };
 
-      root.addEventListener('click', onClick);
-      cleanups.push(() => root.removeEventListener('click', onClick));
-      void bootstrapList();
+      host.addEventListener('click', onSelect);
+      void bootstrap();
 
-      return () => cleanups.forEach((fn) => fn?.());
+      return () => {
+        host.removeEventListener('click', onSelect);
+        cleanups.forEach((fn) => fn?.());
+      };
     },
   };
 }

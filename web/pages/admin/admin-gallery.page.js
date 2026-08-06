@@ -31,7 +31,7 @@ export function adminGalleryPage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'admin-gallery-alert' })}
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Subir imagen</h3>
         <form id="create-gallery-form" class="mt-4 space-y-4">
           <div>
@@ -203,7 +203,7 @@ export function adminGalleryPage() {
 function renderGalleryCard(item, index, total) {
   const image = resolveUploadUrl(item.imageUrl);
   return `
-    <article class="surface-card overflow-hidden" data-gallery-card data-gallery-id="${item.id}">
+    <article class="panel overflow-hidden" data-gallery-card data-gallery-id="${item.id}">
       <div class="aspect-[4/3] overflow-hidden bg-surface-950">
         ${
           image

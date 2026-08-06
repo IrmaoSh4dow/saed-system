@@ -135,7 +135,7 @@ function renderDetail(root, state) {
   ];
 
   host.innerHTML = `
-    <section class="surface-card overflow-hidden p-6 md:p-8">
+    <section class="panel overflow-hidden p-6 md:p-8">
       <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div class="flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-surface-950">
           ${
@@ -154,7 +154,7 @@ function renderDetail(root, state) {
             <span>${department._count?.supervisors ?? supervisors.length} encargados</span>
             ${
               openOpening
-                ? `<span class="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">Convocatoria abierta</span>`
+                ? `<span class="rounded-full border border-brand-400/25 bg-brand-500/15 px-2.5 py-0.5 text-xs font-semibold text-brand-300">Convocatoria abierta</span>`
                 : ''
             }
           </div>
@@ -189,7 +189,7 @@ function renderOverview(department, supervisors, openOpening) {
 
   return `
     <div class="grid gap-6 lg:grid-cols-2">
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Encargados</h3>
         <div class="mt-4 space-y-3">
           ${
@@ -226,7 +226,7 @@ function renderOverview(department, supervisors, openOpening) {
             : ''
         }
       </section>
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Convocatoria activa</h3>
         ${
           openOpening
@@ -248,7 +248,7 @@ function renderOverview(department, supervisors, openOpening) {
 
 function renderMembers(members) {
   return `
-    <section class="surface-card p-6">
+    <section class="panel p-6">
       <h3 class="text-sm font-semibold text-white">Miembros</h3>
       <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         ${
@@ -268,7 +268,7 @@ function renderOpenings(department, ranks, openOpening, canManage) {
       ${
         canManage && !openOpening
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Abrir convocatoria</h3>
           <form id="create-opening-form" class="mt-4 space-y-4">
             <div>
@@ -299,7 +299,7 @@ function renderOpenings(department, ranks, openOpening, canManage) {
       ${
         openOpening && !canManage && department.viewer?.myPendingLetterId
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Postulación enviada</h3>
           <p class="mt-2 text-sm text-ink-300">Ya tienes una carta de interés pendiente en esta convocatoria.</p>
         </section>
@@ -310,7 +310,7 @@ function renderOpenings(department, ranks, openOpening, canManage) {
       ${
         openOpening && !canManage && !department.viewer?.myPendingLetterId
           ? `
-        <section class="surface-card p-6">
+        <section class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Postularse</h3>
           <p class="mt-1 text-xs text-ink-400">${escapeHtml(openOpening.title)}</p>
           <form id="interest-letter-form" class="mt-4 space-y-4">
@@ -333,7 +333,7 @@ function renderOpenings(department, ranks, openOpening, canManage) {
           : ''
       }
 
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Historial de convocatorias</h3>
         <div class="mt-4 space-y-3">
           ${
@@ -368,7 +368,7 @@ function renderOpenings(department, ranks, openOpening, canManage) {
 
 function renderApplications(letters) {
   return `
-    <section class="surface-card p-6">
+    <section class="panel p-6">
       <h3 class="text-sm font-semibold text-white">Cartas de interés</h3>
       <div class="mt-4 space-y-4">
         ${

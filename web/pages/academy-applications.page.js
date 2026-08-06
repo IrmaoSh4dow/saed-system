@@ -71,7 +71,7 @@ export function academyApplicationsPage() {
           const host = root.querySelector('#academy-apps-root');
           if (!host) return;
           host.innerHTML = `
-            <section class="surface-card p-5">
+            <section class="panel p-5">
               <div class="space-y-3">
                 ${
                   items.length
@@ -176,7 +176,7 @@ function renderApplicationForm({ type, title, description, path, fields }) {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'academy-apply-alert' })}
-      <section class="surface-card p-5 md:p-8">
+      <section class="panel p-5 md:p-8">
         <div class="flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p class="landing-eyebrow">Postulación</p>

@@ -1,9 +1,9 @@
 import { icon } from '../landing/icons.js';
 import { resolveUploadUrl } from '../../utils/media.js';
-import { renderStaffDecorationsGrid } from './officer-decorations-grid.js';
-import { renderStaffLicensesGrid } from './officer-licenses-grid.js';
-import { renderStaffDepartmentPanel } from './officer-department-panel.js';
-import { renderStaffDepartmentsSection } from './officer-departments-section.js';
+import { renderStaffDecorationsGrid } from './staff-decorations-grid.js';
+import { renderStaffLicensesGrid } from './staff-licenses-grid.js';
+import { renderStaffDepartmentPanel } from './staff-department-panel.js';
+import { renderStaffDepartmentsSection } from './staff-departments-section.js';
 import {
   getDepartmentRoleLabel,
   resolveStaffDepartments,
@@ -37,7 +37,7 @@ export function renderOfficerFiche(officer) {
 
   return `
     <div class="space-y-6">
-      <section class="surface-card overflow-hidden p-6 md:p-8">
+      <section class="panel overflow-hidden p-6 md:p-8">
         <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
           <div class="h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-brand-500/30 bg-brand-500/10 text-xl font-semibold text-brand-200">
             ${
@@ -78,7 +78,7 @@ export function renderOfficerFiche(officer) {
       ${renderStaffDepartmentsSection(officer, { showBadge: false })}
 
       <section class="grid gap-4 lg:grid-cols-2">
-        <article class="surface-card p-6">
+        <article class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Datos del personal</h3>
           <dl class="mt-4 space-y-3 text-sm">
             ${detailRow('Nombre', firstName)}
@@ -100,7 +100,7 @@ export function renderOfficerFiche(officer) {
           </dl>
         </article>
 
-        <article class="surface-card p-6">
+        <article class="panel p-6">
           <h3 class="text-sm font-semibold text-white">Servicio SAED</h3>
           <p class="mt-1 text-xs text-ink-400">Información operativa del perfil SAED.</p>
           <dl class="mt-5 space-y-3 text-sm">
@@ -118,14 +118,14 @@ export function renderOfficerFiche(officer) {
         </article>
       </section>
 
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Condecoraciones</h3>
         <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${renderStaffDecorationsGrid(decorations, { emptyClass: 'sm:col-span-2 lg:col-span-3 xl:col-span-4' })}
         </div>
       </section>
 
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Licencias</h3>
         <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${renderStaffLicensesGrid(licenses, { emptyClass: 'sm:col-span-2 lg:col-span-3 xl:col-span-4' })}
@@ -137,7 +137,7 @@ export function renderOfficerFiche(officer) {
 
 function statCard(label, value, iconName) {
   return `
-    <article class="surface-card p-5">
+    <article class="panel p-5">
       <div class="flex items-center gap-3">
         <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-ink-300">
           ${icon(iconName, 'h-4 w-4')}

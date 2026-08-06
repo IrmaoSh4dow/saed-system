@@ -88,6 +88,7 @@ export class GalleryService {
     return this.prismaService.galleryItem.findMany({
       where: { status: GalleryItemStatus.ACTIVE },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      take: 8,
     });
   }
 

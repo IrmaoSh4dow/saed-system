@@ -1,6 +1,6 @@
 /**
  * Whether the active character already belongs to the SAED
- * (officer profile or cadet/officer status).
+ * (staff profile or intern/medical staff status).
  */
 export function isSaedMember(character) {
   if (!character) {
@@ -19,8 +19,12 @@ export function canSubmitAcademyApplication(character) {
   return Boolean(character) && !isSaedMember(character);
 }
 
-/** Cadet portal attendance actions — never staff/managers. */
+/** Intern portal attendance actions — never managers. */
 export function isCadetCharacter(character) {
+  return isInternCharacter(character);
+}
+
+export function isInternCharacter(character) {
   if (!character) {
     return false;
   }
@@ -30,5 +34,5 @@ export function isCadetCharacter(character) {
   }
 
   const roles = character.roles ?? [];
-  return roles.includes('cadet') || roles.some((role) => role === 'cadet' || role?.slug === 'cadet');
+  return roles.some((role) => role === 'intern' || role?.slug === 'intern');
 }

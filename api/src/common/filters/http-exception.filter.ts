@@ -49,6 +49,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = 'Validation failed';
         errors = payload.message;
       }
+      if (Array.isArray(payload.errors)) {
+        errors = payload.errors;
+      }
     } else if (exception instanceof Error) {
       message = exception.message;
     }

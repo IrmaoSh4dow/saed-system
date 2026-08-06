@@ -251,7 +251,7 @@ export class StaffService {
     }
 
     if (character.staffProfile) {
-      throw new ConflictException('Character already has an officer profile');
+      throw new ConflictException('Character already has a medical staff profile');
     }
 
     await this.assertRankExists(dto.rankId);
@@ -267,7 +267,7 @@ export class StaffService {
       throw new ConflictException('Badge number is already in use');
     }
 
-    const roleSlug = dto.roleSlug?.trim() || 'officer';
+    const roleSlug = dto.roleSlug?.trim() || 'doctor';
     this.assertCanAssignSystemRole(roleSlug, actor.permissions ?? []);
     const role = await this.rolesService.findBySlug(roleSlug);
     const rank = await this.prismaService.rank.findUnique({ where: { id: dto.rankId } });
@@ -323,7 +323,7 @@ export class StaffService {
           characterId: character.id,
           type: OccupationType.DEPARTMENT,
           organization: SAED_ORGANIZATION,
-          position: rank?.name ?? 'Officer',
+          position: rank?.name ?? 'Médico',
           isPrimary: true,
           isActive: true,
           startedAt: joinedAt,
@@ -514,8 +514,8 @@ export class StaffService {
           toDepartmentId: officer.departmentId,
           toDepartmentName: officer.department?.name ?? null,
           message: dto.departmentId
-            ? `Se asignó ${officer.department?.name ?? 'división'} al oficial ${officerName}`
-            : `Se removió la división primaria del oficial ${officerName}`,
+            ? `Se asignó ${officer.department?.name ?? 'departamento'} al personal ${officerName}`
+            : `Se removió el departamento primario del personal ${officerName}`,
         },
       });
     }
@@ -626,8 +626,8 @@ export class StaffService {
         role: membership.role,
         isPrimary: membership.isPrimary,
         message: membership.isPrimary
-          ? `Se asignó ${membership.department.name} como división principal al oficial ${officerName}`
-          : `Se asignó ${membership.department.name} como división alterna al oficial ${officerName}`,
+          ? `Se asignó ${membership.department.name} como departamento principal al personal ${officerName}`
+          : `Se asignó ${membership.department.name} como departamento alterno al personal ${officerName}`,
       },
     });
 
@@ -679,7 +679,7 @@ export class StaffService {
         departmentName: existing.department.name,
         role: existing.role,
         wasPrimary: existing.isPrimary,
-        message: `Se removió ${existing.department.name} del oficial ${officerName}`,
+        message: `Se removió ${existing.department.name} del personal ${officerName}`,
       },
     });
 
@@ -785,7 +785,7 @@ export class StaffService {
           officerName,
           fromEmployeeNumber: previous.employeeNumber,
           toEmployeeNumber: officer.employeeNumber,
-          message: `Se modificó la placa del oficial ${officerName}`,
+          message: `Se modificó el nº de empleado del personal ${officerName}`,
         },
       });
     }
@@ -801,7 +801,7 @@ export class StaffService {
           officerName,
           fromCallsign: previous.callsign,
           toCallsign: officer.callsign,
-          message: `Se modificó el indicativo del oficial ${officerName}`,
+          message: `Se modificó el indicativo del personal ${officerName}`,
         },
       });
     }

@@ -14,6 +14,15 @@ export const AUDIT_TARGET = {
   ACADEMY: 'Academy',
   NEWS: 'News',
   GALLERY: 'Gallery',
+  INCENTIVE: 'Incentive',
+  INCENTIVE_CONFIGURATION: 'IncentiveConfiguration',
+  ADMIN_REQUEST: 'AdminRequest',
+  ESTABLISHMENT: 'Establishment',
+  AGREEMENT: 'Agreement',
+  PSYCHOTECHNICAL_EVALUATION: 'PsychotechnicalEvaluation',
+  MEDICAL_LEAVE: 'MedicalLeave',
+  MEDICAL_RECORD_ACCESS_REQUEST: 'MedicalRecordAccessRequest',
+  STAFF_RATING: 'StaffRating',
 } as const;
 
 export interface ICreateAuditLogInput {

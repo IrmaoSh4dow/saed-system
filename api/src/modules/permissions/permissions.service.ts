@@ -3,8 +3,8 @@ import { CharacterStatus } from '@prisma/client';
 import { MEDICAL_ACADEMY_DEPARTMENT_SLUG } from '../../common/constants/departments';
 import { PrismaService } from '../../database/prisma.service';
 
-/** Effective academy staff permissions granted to RTD supervisors. */
-const RTD_ACADEMY_PERMISSIONS = [
+/** Effective academy staff permissions granted to Medical Academy supervisors. */
+const MEDICAL_ACADEMY_SUPERVISOR_PERMISSIONS = [
   'academy.read',
   'academy.manage',
   'academy.applications',
@@ -44,13 +44,13 @@ export class PermissionsService {
       }
     }
 
-    if (await this.isRtdSupervisor(characterId)) {
-      for (const key of RTD_ACADEMY_PERMISSIONS) {
+    if (await this.isMedicalAcademySupervisor(characterId)) {
+      for (const key of MEDICAL_ACADEMY_SUPERVISOR_PERMISSIONS) {
         keys.add(key);
       }
     }
 
-    if (await this.belongsToLspd(characterId)) {
+    if (await this.belongsToSaed(characterId)) {
       keys.delete('academy.apply');
     }
 
@@ -66,18 +66,18 @@ export class PermissionsService {
     return characterRoles.map((item) => item.role.slug).sort();
   }
 
-  async isRtdSupervisor(characterId: string): Promise<boolean> {
-    const officer = await this.prismaService.staffProfile.findUnique({
+  async isMedicalAcademySupervisor(characterId: string): Promise<boolean> {
+    const staffProfile = await this.prismaService.staffProfile.findUnique({
       where: { characterId },
       select: { id: true },
     });
-    if (!officer) {
+    if (!staffProfile) {
       return false;
     }
 
     const row = await this.prismaService.departmentSupervisor.findFirst({
       where: {
-        staffProfileId: officer.id,
+        staffProfileId: staffProfile.id,
         department: { slug: MEDICAL_ACADEMY_DEPARTMENT_SLUG, isActive: true },
       },
       select: { id: true },
@@ -86,7 +86,12 @@ export class PermissionsService {
     return Boolean(row);
   }
 
-  async belongsToLspd(characterId: string): Promise<boolean> {
+  /** @deprecated Use isMedicalAcademySupervisor */
+  async isRtdSupervisor(characterId: string): Promise<boolean> {
+    return this.isMedicalAcademySupervisor(characterId);
+  }
+
+  async belongsToSaed(characterId: string): Promise<boolean> {
     const character = await this.prismaService.character.findUnique({
       where: { id: characterId },
       select: {
@@ -104,5 +109,10 @@ export class PermissionsService {
       character.status === CharacterStatus.INTERN ||
       character.status === CharacterStatus.MEDICAL_STAFF
     );
+  }
+
+  /** @deprecated Use belongsToSaed */
+  async belongsToLspd(characterId: string): Promise<boolean> {
+    return this.belongsToSaed(characterId);
   }
 }

@@ -32,6 +32,26 @@ enum CharacterSex {
   OTHER
 }
 
+/// Clinical blood type for Patient records (not Character auth identity).
+enum BloodType {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  DECEASED
+  ARCHIVED
+}
+
 enum StaffStatus {
   ACTIVE
   INACTIVE
@@ -71,6 +91,33 @@ enum ComplaintEventType {
   EVIDENCE_REMOVED
 }
 
+enum AppointmentType {
+  MEDICAL
+  PSYCHOTECHNICAL_CIVIL
+  PSYCHOTECHNICAL_LSPD
+}
+
+enum AppointmentStatus {
+  PENDING
+  SCHEDULED
+  IN_PROGRESS
+  WAITING_FOR_CITIZEN
+  COMPLETED
+  CANCELLED
+  REJECTED
+  NO_SHOW
+}
+
+enum AppointmentEventType {
+  CREATED
+  STATUS_CHANGED
+  STAFF_ASSIGNED
+  STAFF_REMOVED
+  DEPARTMENT_TRANSFERRED
+  MESSAGE_SENT
+  INTERNAL_NOTE_ADDED
+}
+
 enum NewsStatus {
   DRAFT
   PUBLISHED
@@ -82,11 +129,28 @@ enum GalleryItemStatus {
   HIDDEN
 }
 
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
 enum NotificationType {
   COMPLAINT_CREATED
   COMPLAINT_MESSAGE
   COMPLAINT_STATUS
   COMPLAINT_ASSIGNED
+  APPOINTMENT_CREATED
+  APPOINTMENT_MESSAGE
+  APPOINTMENT_STATUS
+  APPOINTMENT_ASSIGNED
+  ADMIN_REQUEST_CREATED
+  ADMIN_REQUEST_MESSAGE
+  ADMIN_REQUEST_STATUS
+  ADMIN_REQUEST_ASSIGNED
+  ADMIN_REQUEST_NOTE
+  MEDICAL_RECORD_ACCESS_CREATED
+  MEDICAL_RECORD_ACCESS_STATUS
+  STAFF_RATING_CREATED
   DEPARTMENT_OPENING
   DEPARTMENT_INTEREST_LETTER
   DEPARTMENT_APPLICATION_ACCEPTED
@@ -105,6 +169,41 @@ enum NotificationType {
   ACADEMY_ANNOUNCEMENT
   ACADEMY_ATTENDANCE
   SYSTEM
+}
+
+/// Extensible catalog of institutional administrative request kinds.
+enum AdminRequestType {
+  ADMINISTRATIVE_APPOINTMENT
+  AGREEMENT_SIGNING
+  HIGH_COMMAND_MEETING
+  COMMERCIAL_REQUEST
+  OTHER
+}
+
+enum AdminRequestStatus {
+  PENDING
+  UNDER_REVIEW
+  IN_PROCESS
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum AdminRequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AdminRequestEventType {
+  CREATED
+  STATUS_CHANGED
+  ASSIGNEE_CHANGED
+  MESSAGE_SENT
+  INTERNAL_NOTE_ADDED
+  PRIORITY_CHANGED
 }
 
 enum AcademyTrainingStatus {
@@ -267,6 +366,11 @@ model Character {
   complaintInternalNotes ComplaintInternalNote[]
   complaintAssignments  ComplaintAssignment[]
   complaintEvents       ComplaintEvent[]
+  appointmentsRequested       Appointment[]              @relation("AppointmentRequester")
+  appointmentMessages         AppointmentMessage[]
+  appointmentInternalNotes    AppointmentInternalNote[]
+  appointmentAssignments      AppointmentAssignment[]
+  appointmentEvents           AppointmentEvent[]
   notifications         Notification[]
   reportsCreated        Report[]                 @relation("ReportCreator")
   reportTransfers       ReportTransfer[]         @relation("ReportTransferActor")
@@ -278,6 +382,29 @@ model Character {
   academyApplications        AcademyApplication[] @relation("AcademyApplicationApplicant")
   academyApplicationsReviewed AcademyApplication[] @relation("AcademyApplicationReviewer")
   newsArticlesAuthored       NewsArticle[]        @relation("NewsArticleAuthor")
+  staffShifts                StaffShift[]
+  /// Optional clinical Patient link (never required; Patient ≠ Character).
+  linkedPatient              Patient?             @relation("PatientLinkedCharacter")
+  patientsCreated            Patient[]            @relation("PatientCreatedBy")
+  patientsUpdated            Patient[]            @relation("PatientUpdatedBy")
+  patientInvoicesCreated     PatientInvoice[]     @relation("PatientInvoiceCreatedBy")
+  incentivePaymentsMade      IncentivePayment[]   @relation("IncentivePaidBy")
+  incentiveConfigurationsUpdated IncentiveConfiguration[] @relation("IncentiveConfigUpdatedBy")
+  adminRequestsFiled         AdminRequest[]              @relation("AdminRequestRequester")
+  adminRequestsAssigned      AdminRequest[]              @relation("AdminRequestAssignee")
+  adminRequestMessages       AdminRequestMessage[]
+  adminRequestInternalNotes  AdminRequestInternalNote[]
+  adminRequestAssignments    AdminRequestAssignment[]
+  adminRequestEvents         AdminRequestEvent[]
+  agreementsCreated          Agreement[]        @relation("AgreementCreatedBy")
+  agreementHistoriesChanged  AgreementHistory[] @relation("AgreementHistoryChangedBy")
+  psychotechnicalEvaluationsAsPhysician PsychotechnicalEvaluation[] @relation("PsychotechnicalPhysician")
+  psychotechnicalEvaluationsCreated     PsychotechnicalEvaluation[] @relation("PsychotechnicalCreatedBy")
+  medicalLeavesAsPhysician   MedicalLeave[]     @relation("MedicalLeavePhysician")
+  medicalLeavesCreated       MedicalLeave[]     @relation("MedicalLeaveCreatedBy")
+  medicalRecordAccessRequestsFiled    MedicalRecordAccessRequest[] @relation("MedicalRecordAccessRequester")
+  medicalRecordAccessRequestsReviewed MedicalRecordAccessRequest[] @relation("MedicalRecordAccessReviewer")
+  staffRatingsGiven                   StaffRating[]                @relation("StaffRatingReviewer")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -288,22 +415,102 @@ model Character {
 
 /// Civilian/agency employment. Independent from StaffProfile (SAED membership).
 model Occupation {
-  id           String          @id @default(uuid())
-  characterId  String
-  character    Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  type         OccupationType  @default(EMPLOYMENT)
-  organization String
-  position     String?
-  isPrimary    Boolean         @default(false)
-  isActive     Boolean         @default(true)
-  startedAt    DateTime?       @db.Date
-  endedAt      DateTime?       @db.Date
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id              String          @id @default(uuid())
+  characterId     String
+  character       Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  type            OccupationType  @default(EMPLOYMENT)
+  /// Display/snapshot name (kept for history even if Establishment is renamed).
+  organization    String
+  /// Optional FK to administrable Establishment catalog.
+  establishmentId String?
+  establishment   Establishment?  @relation(fields: [establishmentId], references: [id], onDelete: SetNull)
+  position        String?
+  isPrimary       Boolean         @default(false)
+  isActive        Boolean         @default(true)
+  startedAt       DateTime?       @db.Date
+  endedAt         DateTime?       @db.Date
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([characterId])
   @@index([organization])
+  @@index([establishmentId])
   @@index([isActive])
+}
+
+enum EstablishmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AgreementStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+/// Administrable civilian workplace / business catalog (replaces hardcoded selects).
+model Establishment {
+  id              String              @id @default(uuid())
+  slug            String              @unique
+  name            String              @unique
+  description     String?
+  logoUrl         String?
+  status          EstablishmentStatus @default(ACTIVE)
+  /// Shown as default Occupation.position when selected.
+  defaultPosition String              @default("Empleado")
+  occupationType  OccupationType      @default(BUSINESS)
+  /// When false, hidden from character creation (e.g. archived brands).
+  isSelectable    Boolean             @default(true)
+  sortOrder       Int                 @default(0)
+  occupations     Occupation[]
+  agreements      Agreement[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status, isSelectable, sortOrder])
+}
+
+/// Institutional business agreement (convenio) with an Establishment. Independent entity.
+model Agreement {
+  id                   String           @id @default(uuid())
+  establishmentId      String
+  establishment        Establishment    @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  status               AgreementStatus  @default(DRAFT)
+  startsAt             DateTime         @db.Date
+  endsAt               DateTime?        @db.Date
+  discountPercent      Decimal          @db.Decimal(5, 2)
+  notes                String?
+  createdByCharacterId String?
+  createdByCharacter   Character?       @relation("AgreementCreatedBy", fields: [createdByCharacterId], references: [id], onDelete: SetNull)
+  history              AgreementHistory[]
+  invoices             PatientInvoice[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([establishmentId, status])
+  @@index([status, startsAt])
+  @@index([endsAt])
+}
+
+/// Immutable change log for agreement terms (renewals, percentage changes).
+model AgreementHistory {
+  id                   String     @id @default(uuid())
+  agreementId          String
+  agreement            Agreement  @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  previousPercent      Decimal?   @db.Decimal(5, 2)
+  newPercent           Decimal    @db.Decimal(5, 2)
+  previousStatus       AgreementStatus?
+  newStatus            AgreementStatus
+  previousEndsAt       DateTime?  @db.Date
+  newEndsAt            DateTime?  @db.Date
+  notes                String?
+  changedByCharacterId String?
+  changedByCharacter   Character? @relation("AgreementHistoryChangedBy", fields: [changedByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime   @default(now())
+
+  @@index([agreementId, createdAt])
 }
 
 /// Medical/civilian hierarchy catalog. Not authorization (RBAC uses Role).
@@ -317,6 +524,8 @@ model Rank {
   characters    Character[]
   staffProfiles StaffProfile[]
   openings      DepartmentOpening[]
+  incentiveConfiguration IncentiveConfiguration?
+  incentivePayments      IncentivePayment[]
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 }
@@ -336,6 +545,7 @@ model Department {
   reports      Report[]
   transfersFrom ReportTransfer[]    @relation("ReportTransferFrom")
   transfersTo   ReportTransfer[]    @relation("ReportTransferTo")
+  appointments Appointment[]
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 }
@@ -420,12 +630,100 @@ model StaffProfile {
   reportsLed       Report[]             @relation("ReportLead")
   reportParticipations ReportParticipant[]
   academyTrainingSupports AcademyTrainingSupportStaff[]
+  staffShifts      StaffShift[]
+  incentivePayments IncentivePayment[]
+  ratings          StaffRating[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
   @@index([rankId])
   @@index([departmentId])
   @@index([status])
+}
+
+/// Citizen feedback on medical staff after a completed administrative appointment.
+/// Never deleted — ratings are immutable audit history belonging to the professional.
+model StaffRating {
+  id                  String       @id @default(uuid())
+  ratingNumber        Int          @unique @default(autoincrement())
+  staffProfileId      String
+  staffProfile        StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Restrict)
+  reviewerCharacterId String
+  reviewerCharacter   Character    @relation("StaffRatingReviewer", fields: [reviewerCharacterId], references: [id], onDelete: Restrict)
+  adminRequestId      String       @unique
+  adminRequest        AdminRequest @relation(fields: [adminRequestId], references: [id], onDelete: Restrict)
+  /// Star score from 1 to 5.
+  score               Int
+  comment             String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([staffProfileId, createdAt])
+  @@index([reviewerCharacterId])
+  @@index([score])
+  @@index([createdAt])
+}
+
+/// Duty / shift clock-in records for medical staff.
+model StaffShift {
+  id               String       @id @default(uuid())
+  staffProfileId   String
+  staffProfile     StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  characterId      String
+  character        Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  startedAt        DateTime
+  endedAt          DateTime?
+  durationSeconds  Int?
+  status           ShiftStatus  @default(OPEN)
+  timezone         String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([staffProfileId, status])
+  @@index([staffProfileId, startedAt])
+  @@index([characterId, startedAt])
+}
+
+/// Configurable incentive amount per institutional rank (never hardcode amounts in code).
+model IncentiveConfiguration {
+  id                   String     @id @default(uuid())
+  rankId               String     @unique
+  rank                 Rank       @relation(fields: [rankId], references: [id], onDelete: Cascade)
+  amount               Decimal    @db.Decimal(12, 2)
+  isActive             Boolean    @default(true)
+  updatedByCharacterId String?
+  updatedByCharacter   Character? @relation("IncentiveConfigUpdatedBy", fields: [updatedByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([isActive])
+}
+
+/// Immutable incentive payment record. One payment every 7 days per staff member.
+model IncentivePayment {
+  id                String       @id @default(uuid())
+  staffProfileId    String
+  staffProfile      StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Restrict)
+  paidByCharacterId String
+  paidByCharacter   Character    @relation("IncentivePaidBy", fields: [paidByCharacterId], references: [id], onDelete: Restrict)
+  amount            Decimal      @db.Decimal(12, 2)
+  /// Rank used to resolve the amount at payment time (historical snapshot).
+  rankId            String
+  rank              Rank         @relation(fields: [rankId], references: [id], onDelete: Restrict)
+  rankName          String
+  rankSlug          String
+  paidAt            DateTime     @default(now())
+  /// Next eligibility instant after this payment (paidAt + cycle).
+  nextEligibleAt    DateTime
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([staffProfileId, paidAt])
+  @@index([paidByCharacterId, paidAt])
+  @@index([rankId])
+  @@index([paidAt])
+  @@index([nextEligibleAt])
 }
 
 /// Many-to-many staff ↔ department with role (member / lead / supervisor).
@@ -501,6 +799,294 @@ model StaffLicense {
   @@unique([staffProfileId, licenseId])
   @@index([licenseId])
   @@index([assignedByAccountId])
+}
+
+/// Clinical hospital record. Independent from Character (auth/RP identity).
+/// Optional linkedCharacterId prepares future patient↔character linking.
+model Patient {
+  id                    String         @id @default(uuid())
+  recordNumber          Int            @unique @default(autoincrement())
+  firstName             String
+  lastName              String
+  middleName            String?
+  birthDate             DateTime?      @db.Date
+  sex                   CharacterSex?
+  nationality           String?
+  phone                 String?
+  /// Optional RP identity document. Unique when present (PostgreSQL allows multiple nulls).
+  identityDocument      String?        @unique
+  bloodType             BloodType      @default(UNKNOWN)
+  allergies             String?
+  chronicConditions     String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  notes                 String?
+  avatarUrl             String?
+  status                PatientStatus  @default(ACTIVE)
+  /// Optional link to a playable Character. Never required.
+  linkedCharacterId     String?        @unique
+  linkedCharacter       Character?     @relation("PatientLinkedCharacter", fields: [linkedCharacterId], references: [id], onDelete: SetNull)
+  /// Normalized blob for fast flexible search (names + phone + document).
+  searchKey             String
+  createdByCharacterId  String?
+  createdByCharacter    Character?     @relation("PatientCreatedBy", fields: [createdByCharacterId], references: [id], onDelete: SetNull)
+  updatedByCharacterId  String?
+  updatedByCharacter    Character?     @relation("PatientUpdatedBy", fields: [updatedByCharacterId], references: [id], onDelete: SetNull)
+  invoices              PatientInvoice[]
+  reports               Report[]
+  medicalRecords        MedicalRecord[]
+  hospitalizations      Hospitalization[]
+  diagnoses             Diagnosis[]
+  surgeries             Surgery[]
+  psychotechnicalEvaluations PsychotechnicalEvaluation[]
+  medicalLeaves         MedicalLeave[]
+  medicalRecordAccessRequests MedicalRecordAccessRequest[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([searchKey])
+  @@index([lastName, firstName])
+  @@index([birthDate])
+  @@index([phone])
+  @@index([identityDocument])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum PsychotechnicalResult {
+  FIT
+  FIT_WITH_OBSERVATIONS
+  UNFIT
+}
+
+enum MedicalLeaveStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+/// Independent psychotechnical evaluation (historial). Never a flat field on Patient.
+model PsychotechnicalEvaluation {
+  id                   String                @id @default(uuid())
+  patientId            String
+  patient              Patient               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  result               PsychotechnicalResult
+  issuedAt             DateTime              @db.Date
+  expiresAt            DateTime?             @db.Date
+  observations         String?
+  physicianCharacterId String?
+  physicianCharacter   Character?            @relation("PsychotechnicalPhysician", fields: [physicianCharacterId], references: [id], onDelete: SetNull)
+  createdByCharacterId String?
+  createdByCharacter   Character?            @relation("PsychotechnicalCreatedBy", fields: [createdByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([patientId, issuedAt])
+  @@index([result, expiresAt])
+  @@index([physicianCharacterId])
+}
+
+/// Independent medical leave (baja médica) with immutable history.
+model MedicalLeave {
+  id                   String             @id @default(uuid())
+  patientId            String
+  patient              Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  status               MedicalLeaveStatus @default(ACTIVE)
+  startsAt             DateTime           @db.Date
+  endsAt               DateTime?          @db.Date
+  reason               String
+  observations         String?
+  physicianCharacterId String?
+  physicianCharacter   Character?         @relation("MedicalLeavePhysician", fields: [physicianCharacterId], references: [id], onDelete: SetNull)
+  createdByCharacterId String?
+  createdByCharacter   Character?         @relation("MedicalLeaveCreatedBy", fields: [createdByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([patientId, status])
+  @@index([status, startsAt])
+  @@index([endsAt])
+  @@index([physicianCharacterId])
+}
+
+enum MedicalRecordStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum HospitalizationStatus {
+  ADMITTED
+  DISCHARGED
+  TRANSFERRED
+  CANCELLED
+}
+
+enum SurgeryStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+/// Clinical medical record (expediente). Always belongs to Patient, never Character.
+model MedicalRecord {
+  id                   String              @id @default(uuid())
+  patientId            String
+  patient              Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title                String
+  summary              String?
+  status               MedicalRecordStatus @default(OPEN)
+  openedAt             DateTime            @default(now())
+  closedAt             DateTime?
+  createdByCharacterId String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([patientId, createdAt])
+  @@index([status])
+}
+
+/// Hospital admission episode for a Patient.
+model Hospitalization {
+  id                   String                @id @default(uuid())
+  patientId            String
+  patient              Patient               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  reason               String?
+  notes                String?
+  status               HospitalizationStatus @default(ADMITTED)
+  admittedAt           DateTime              @default(now())
+  dischargedAt         DateTime?
+  createdByCharacterId String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([patientId, admittedAt])
+  @@index([status])
+}
+
+/// Clinical diagnosis registered against a Patient.
+model Diagnosis {
+  id                   String    @id @default(uuid())
+  patientId            String
+  patient              Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  code                 String?
+  name                 String
+  notes                String?
+  diagnosedAt          DateTime  @default(now()) @db.Date
+  createdByCharacterId String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([patientId, diagnosedAt])
+}
+
+/// Surgical procedure registered against a Patient.
+model Surgery {
+  id                   String        @id @default(uuid())
+  patientId            String
+  patient              Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name                 String
+  notes                String?
+  status               SurgeryStatus @default(SCHEDULED)
+  performedAt          DateTime?     @db.Date
+  createdByCharacterId String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([patientId, performedAt])
+  @@index([status])
+}
+
+/// Catalog of billable clinical treatments (name + price for invoice selects).
+model Treatment {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  price       Decimal          @db.Decimal(10, 2)
+  description String?
+  isActive    Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  invoices    PatientInvoice[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+/// Invoice line tied to a Patient clinical record (never to Character).
+model PatientInvoice {
+  id                   String     @id @default(uuid())
+  invoiceNumber        Int        @unique @default(autoincrement())
+  patientId            String
+  patient              Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  treatmentId          String
+  treatment            Treatment  @relation(fields: [treatmentId], references: [id], onDelete: Restrict)
+  /// Snapshot at billing time so catalog price changes do not rewrite history.
+  treatmentName        String
+  /// Pre-discount treatment price snapshot.
+  originalAmount       Decimal    @db.Decimal(10, 2)
+  discountPercent      Decimal    @default(0) @db.Decimal(5, 2)
+  discountAmount       Decimal    @default(0) @db.Decimal(10, 2)
+  /// Final amount charged (originalAmount - discountAmount).
+  amount               Decimal    @db.Decimal(10, 2)
+  /// Optional agreement used at billing time (historical reference).
+  agreementId          String?
+  agreement            Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
+  /// Convenio establishment display name (discount context).
+  establishmentName    String?
+  /// Institutional billing snapshot at emission time (never follows later job changes).
+  billingOrganization      String?
+  billingEstablishmentId   String?
+  billingEstablishmentSlug String?
+  issuedAt             DateTime   @db.Date
+  notes                String?
+  createdByCharacterId String?
+  createdByCharacter   Character? @relation("PatientInvoiceCreatedBy", fields: [createdByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([patientId, issuedAt])
+  @@index([treatmentId])
+  @@index([agreementId])
+  @@index([billingEstablishmentSlug, issuedAt])
+  @@index([billingOrganization, issuedAt])
+  @@index([createdByCharacterId])
+}
+
+enum MedicalRecordAccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+/// Temporary clinical-record access grant for external agencies (e.g. LSPD).
+model MedicalRecordAccessRequest {
+  id                     String                     @id @default(uuid())
+  requestNumber          Int                        @unique @default(autoincrement())
+  patientId              String
+  patient                Patient                    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  requesterCharacterId   String
+  requesterCharacter     Character                  @relation("MedicalRecordAccessRequester", fields: [requesterCharacterId], references: [id], onDelete: Restrict)
+  /// Snapshot of requester organization at request time.
+  requesterOrganization  String
+  reason                 String
+  status                 MedicalRecordAccessStatus  @default(PENDING)
+  reviewedByCharacterId  String?
+  reviewedByCharacter    Character?                 @relation("MedicalRecordAccessReviewer", fields: [reviewedByCharacterId], references: [id], onDelete: SetNull)
+  reviewedAt             DateTime?
+  decisionNotes          String?
+  approvedAt             DateTime?
+  /// Access window end (typically approvedAt + 24h).
+  expiresAt              DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  @@index([patientId, status])
+  @@index([requesterCharacterId, status])
+  @@index([status, expiresAt])
+  @@index([createdAt])
 }
 
 model Complaint {
@@ -596,6 +1182,86 @@ model ComplaintEvent {
   @@index([complaintId, createdAt])
 }
 
+model Appointment {
+  id             String            @id @default(uuid())
+  caseNumber     Int               @unique @default(autoincrement())
+  type           AppointmentType
+  title          String
+  description    String
+  preferredDate  DateTime?         @db.Date
+  status         AppointmentStatus @default(PENDING)
+  requesterId    String
+  requester      Character         @relation("AppointmentRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  departmentId   String?
+  department     Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  scheduledAt    DateTime?
+  messages       AppointmentMessage[]
+  internalNotes  AppointmentInternalNote[]
+  assignments    AppointmentAssignment[]
+  events         AppointmentEvent[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AppointmentMessage {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        Character   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body          String
+  createdAt     DateTime    @default(now())
+
+  @@index([appointmentId, createdAt])
+  @@index([authorId])
+}
+
+model AppointmentInternalNote {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        Character   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body          String
+  createdAt     DateTime    @default(now())
+
+  @@index([appointmentId, createdAt])
+  @@index([authorId])
+}
+
+model AppointmentAssignment {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  characterId   String
+  character     Character   @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  isPrimary     Boolean     @default(false)
+  assignedAt    DateTime    @default(now())
+  unassignedAt  DateTime?
+
+  @@unique([appointmentId, characterId])
+  @@index([characterId])
+}
+
+model AppointmentEvent {
+  id            String               @id @default(uuid())
+  appointmentId String
+  appointment   Appointment          @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         Character?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  type          AppointmentEventType
+  message       String
+  metadata      Json?
+  createdAt     DateTime             @default(now())
+
+  @@index([appointmentId, createdAt])
+}
+
 model Notification {
   id          String           @id @default(uuid())
   accountId   String
@@ -688,6 +1354,9 @@ model Report {
   location             String?
   status               ReportStatus        @default(PENDING)
   priority             ReportPriority      @default(MEDIUM)
+  /// Clinical subject. Every medical report must belong to a Patient (never Character).
+  patientId            String
+  patient              Patient             @relation(fields: [patientId], references: [id], onDelete: Restrict)
   departmentId           String?
   department             Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   leadStaffId        String?
@@ -700,6 +1369,7 @@ model Report {
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
+  @@index([patientId, createdAt])
   @@index([departmentId])
   @@index([leadStaffId])
   @@index([createdByCharacterId])
@@ -877,4 +1547,93 @@ model AcademyApplication {
   @@index([type, status])
   @@index([characterId, createdAt])
   @@index([status, createdAt])
+}
+
+/// Institutional administrative requests (meetings, agreements, commercial, etc.).
+model AdminRequest {
+  id           String               @id @default(uuid())
+  requestNumber Int                 @unique @default(autoincrement())
+  type         AdminRequestType
+  status       AdminRequestStatus   @default(PENDING)
+  priority     AdminRequestPriority @default(MEDIUM)
+  subject      String
+  reason       String
+  requesterId  String
+  requester    Character            @relation("AdminRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  /// Optional primary assignee (Alto Mando). Architecture ready for future workflows.
+  assigneeId   String?
+  assignee     Character?           @relation("AdminRequestAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  messages     AdminRequestMessage[]
+  internalNotes AdminRequestInternalNote[]
+  assignments  AdminRequestAssignment[]
+  events       AdminRequestEvent[]
+  staffRating  StaffRating?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([requesterId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+/// Public chat thread for an administrative request. Text and/or image attachment.
+model AdminRequestMessage {
+  id             String       @id @default(uuid())
+  adminRequestId String
+  adminRequest   AdminRequest @relation(fields: [adminRequestId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         Character    @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body           String?
+  /// Stored as /uploads/admin-request-chat/... when present.
+  imageUrl       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([adminRequestId, createdAt])
+  @@index([authorId])
+}
+
+/// Staff-only notes. Never exposed to civilian requesters.
+model AdminRequestInternalNote {
+  id             String       @id @default(uuid())
+  adminRequestId String
+  adminRequest   AdminRequest @relation(fields: [adminRequestId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         Character    @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body           String
+  createdAt      DateTime     @default(now())
+
+  @@index([adminRequestId, createdAt])
+  @@index([authorId])
+}
+
+/// Assignment history / multi-assignee support (primary also mirrored on AdminRequest.assigneeId).
+model AdminRequestAssignment {
+  id             String       @id @default(uuid())
+  adminRequestId String
+  adminRequest   AdminRequest @relation(fields: [adminRequestId], references: [id], onDelete: Cascade)
+  characterId    String
+  character      Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  isPrimary      Boolean      @default(true)
+  assignedAt     DateTime     @default(now())
+  unassignedAt   DateTime?
+
+  @@unique([adminRequestId, characterId])
+  @@index([characterId])
+}
+
+model AdminRequestEvent {
+  id             String                @id @default(uuid())
+  adminRequestId String
+  adminRequest   AdminRequest          @relation(fields: [adminRequestId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          Character?            @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  type           AdminRequestEventType
+  message        String
+  metadata       Json?
+  createdAt      DateTime              @default(now())
+
+  @@index([adminRequestId, createdAt])
 }

@@ -64,7 +64,7 @@ export function adminAcademyPage() {
   const content = `
     ${renderAuthAlert({ id: 'admin-academy-alert' })}
     <section class="grid gap-6 xl:grid-cols-2">
-      <article class="surface-card p-5 space-y-3">
+      <article class="panel p-5 space-y-3">
         <h3 class="text-sm font-semibold text-white">Gestión rápida</h3>
         <p class="text-sm text-ink-300">Administra entrenamientos, anuncios y revisa postulaciones (RTD / comando).</p>
         <div class="flex flex-wrap gap-2">
@@ -72,13 +72,13 @@ export function adminAcademyPage() {
           <a data-link href="/academy" class="btn-secondary">Portal academia</a>
         </div>
       </article>
-      <article class="surface-card p-5 space-y-3">
+      <article class="panel p-5 space-y-3">
         <h3 class="text-sm font-semibold text-white">Resumen</h3>
         <div id="admin-academy-summary" class="text-sm text-ink-400">Cargando...</div>
       </article>
     </section>
     <section class="grid gap-6 xl:grid-cols-2 mt-6">
-      <article class="surface-card p-5">
+      <article class="panel p-5">
         <h3 class="text-sm font-semibold text-white">Crear entrenamiento</h3>
         <form id="admin-training-form" class="mt-4 space-y-3">
           <div>
@@ -106,7 +106,7 @@ export function adminAcademyPage() {
           <button type="submit" class="btn-primary">Crear</button>
         </form>
       </article>
-      <article class="surface-card p-5">
+      <article class="panel p-5">
         <h3 class="text-sm font-semibold text-white">Publicar anuncio</h3>
         <form id="admin-announcement-form" class="mt-4 space-y-3">
           <div>
@@ -230,7 +230,7 @@ export function adminAcademyApplicationsPage() {
 
   const content = `
     ${renderAuthAlert({ id: 'admin-academy-apps-alert' })}
-    <section class="surface-card p-5">
+    <section class="panel p-5">
       <div id="admin-apps-root"><p class="text-sm text-ink-400">Cargando...</p></div>
     </section>
   `;

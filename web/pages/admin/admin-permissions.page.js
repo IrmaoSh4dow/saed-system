@@ -17,7 +17,7 @@ export function adminPermissionsPage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'admin-permissions-alert' })}
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Catálogo de permisos</h3>
         <p class="mt-1 text-xs text-ink-400">
           Los permisos se asignan mediante roles (RBAC). El rango SAED no concede autorización.

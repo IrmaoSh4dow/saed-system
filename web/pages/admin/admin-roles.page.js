@@ -23,7 +23,7 @@ export function adminRolesPage() {
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'admin-roles-alert' })}
 
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Asignar roles (RBAC)</h3>
         <p class="mt-1 text-xs leading-relaxed text-ink-400">
           <span class="text-ink-200">Rank</span> = jerarquía (Medical Director).<br />
@@ -51,7 +51,7 @@ export function adminRolesPage() {
         </form>
       </section>
 
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Roles del sistema</h3>
         <div id="roles-catalog" class="mt-4 space-y-3"></div>
       </section>

@@ -1,7 +1,7 @@
 import { renderAuthAlert, setAuthAlert } from '../../components/auth/auth-alert.js';
-import { renderStaffDecorationsGrid } from '../../components/staff/officer-decorations-grid.js';
-import { renderStaffDepartmentPanel } from '../../components/staff/officer-department-panel.js';
-import { renderStaffDepartmentsSection } from '../../components/staff/officer-departments-section.js';
+import { renderStaffDecorationsGrid } from '../../components/staff/staff-decorations-grid.js';
+import { renderStaffDepartmentPanel } from '../../components/staff/staff-department-panel.js';
+import { renderStaffDepartmentsSection } from '../../components/staff/staff-departments-section.js';
 import { getApiErrorMessage } from '../../services/auth.service.js';
 import { getCharacterAdmin, listCharactersDirectory } from '../../services/characters.service.js';
 import { createOfficer, updateOfficer } from '../../services/staff.service.js';
@@ -13,10 +13,15 @@ import {
   revokeDecoration,
 } from '../../services/decorations.service.js';
 import { listComplaintsByOfficer } from '../../services/complaints.service.js';
+import {
+  getCharacterRoles,
+  listRoles,
+  setCharacterRoles,
+} from '../../services/roles.service.js';
 import { can } from '../../services/auth-context.js';
 import { formatDateShort } from '../../utils/date.js';
 import { navigate } from '../../utils/router.js';
-import { PERMISSIONS } from '../../utils/permissions.js';
+import { MEDICAL_ROLE_OPTIONS, PERMISSIONS } from '../../utils/permissions.js';
 import { mountAdminPage, renderAdminShell, requireAdminAccess } from './admin-shell.js';
 
 export function adminCharactersPage() {
@@ -27,6 +32,7 @@ export function adminCharactersPage() {
   const canPromote = can(PERMISSIONS.STAFF_CREATE);
   const canUpdateOfficer = can(PERMISSIONS.STAFF_UPDATE);
   const canManageDecorations = can(PERMISSIONS.DECORATIONS_MANAGE);
+  const canAssignRoles = can(PERMISSIONS.ROLES_ASSIGN) || can('*');
   const detailId = new URLSearchParams(window.location.search).get('id');
 
   if (detailId) {
@@ -34,6 +40,7 @@ export function adminCharactersPage() {
       canPromote,
       canUpdateOfficer,
       canManageDecorations,
+      canAssignRoles,
     });
   }
 
@@ -41,7 +48,7 @@ export function adminCharactersPage() {
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'admin-characters-alert' })}
 
-      <section class="surface-card p-5">
+      <section class="panel p-5">
         <div class="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
           <div>
             <label class="form-label" for="characters-query">Buscar</label>
@@ -73,7 +80,7 @@ export function adminCharactersPage() {
         </div>
       </section>
 
-      <section class="surface-card overflow-hidden">
+      <section class="panel overflow-hidden">
         <div class="border-b border-white/10 px-5 py-4 flex items-center justify-between gap-3">
           <h3 class="text-sm font-semibold text-white">Personajes registrados</h3>
           <p id="characters-meta" class="text-xs text-ink-500"></p>
@@ -167,7 +174,7 @@ export function adminCharactersPage() {
 
 function adminCharacterDetailPage(
   characterId,
-  { canPromote, canUpdateOfficer, canManageDecorations },
+  { canPromote, canUpdateOfficer, canManageDecorations, canAssignRoles },
 ) {
   const content = `
     <div class="space-y-6">
@@ -191,32 +198,49 @@ function adminCharacterDetailPage(
       let ranks = [];
       let departments = [];
       let decorations = [];
+      let rolesCatalog = [];
+      let assignedRoleSlugs = [];
 
       const load = async () => {
         try {
-          const [character, ranksData, departmentsData, decorationsData] = await Promise.all([
+          const [
+            character,
+            ranksData,
+            departmentsData,
+            decorationsData,
+            rolesData,
+            characterRolesData,
+          ] = await Promise.all([
             getCharacterAdmin(characterId),
             listRanks(),
             listDepartments(),
             listDecorations().catch(() => []),
+            listRoles().catch(() => []),
+            getCharacterRoles(characterId).catch(() => ({ roles: [] })),
           ]);
           ranks = ranksData;
           departments = departmentsData;
           decorations = decorationsData.filter((item) => item.isActive);
+          rolesCatalog = Array.isArray(rolesData) ? rolesData : [];
+          assignedRoleSlugs = (characterRolesData?.roles ?? []).map((item) => item.slug);
           renderCharacterDetail(root, character, {
             canPromote,
             canUpdateOfficer,
             canManageDecorations,
+            canAssignRoles,
             canViewOfficerComplaints:
               can(PERMISSIONS.COMPLAINTS_MANAGE) || can(PERMISSIONS.ADMIN_ACCESS),
             ranks,
             departments,
             decorations,
+            rolesCatalog,
+            assignedRoleSlugs,
           });
           bindDetailActions(root, character, {
             canPromote,
             canUpdateOfficer,
             canManageDecorations,
+            canAssignRoles,
             canViewOfficerComplaints:
               can(PERMISSIONS.COMPLAINTS_MANAGE) || can(PERMISSIONS.ADMIN_ACCESS),
             load,
@@ -298,10 +322,13 @@ function renderCharacterDetail(
     canPromote,
     canUpdateOfficer,
     canManageDecorations,
+    canAssignRoles = false,
     canViewOfficerComplaints,
     ranks,
     departments,
     decorations,
+    rolesCatalog = [],
+    assignedRoleSlugs = [],
   },
 ) {
   const host = root.querySelector('#character-detail-root');
@@ -318,7 +345,7 @@ function renderCharacterDetail(
   const forcePromote = new URLSearchParams(window.location.search).get('promote') === '1';
 
   host.innerHTML = `
-    <section class="surface-card overflow-hidden p-6 md:p-8">
+    <section class="panel overflow-hidden p-6 md:p-8">
       <div class="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div class="h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-surface-950">
           ${
@@ -341,7 +368,6 @@ function renderCharacterDetail(
             ${officer ? detailRow('Nº empleado', officer.employeeNumber) : ''}
             ${officer ? detailRow('Rango', officer.rankLabel ?? character.rank ?? '—') : ''}
             ${officer ? detailRow('Departamento principal', officer.departmentName ?? 'Sin asignar') : ''}
-            ${detailRow('Roles RBAC', (character.roles ?? []).join(', ') || '—')}
           </dl>
         </div>
         ${renderStaffDepartmentPanel({
@@ -354,10 +380,78 @@ function renderCharacterDetail(
 
     ${officer ? `<div class="mt-6">${renderStaffDepartmentsSection(officer, { showBadge: false })}</div>` : ''}
 
+    <section class="panel p-6">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-white">Roles RBAC</h3>
+          <p class="mt-1 text-xs text-ink-400">
+            Los roles definen permisos del sistema. Para acceso LSPD asigna
+            <span class="text-brand-300">LSPD Medical Supervisor</span>.
+            No requiere promover a personal SAED.
+          </p>
+        </div>
+        ${
+          canAssignRoles
+            ? `<a data-link href="/admin/roles" class="text-xs font-medium text-brand-300 hover:text-brand-200">Abrir gestión de roles →</a>`
+            : `<p class="text-xs text-amber-300">Necesitas permiso roles.assign</p>`
+        }
+      </div>
+
+      <form id="character-roles-form" class="mt-5 space-y-4">
+        <div class="grid gap-2 sm:grid-cols-2">
+          ${
+            rolesCatalog.length
+              ? rolesCatalog
+                  .map((role) => {
+                    const checked = assignedRoleSlugs.includes(role.slug);
+                    const isLspd = role.slug === 'lspd-medical-supervisor';
+                    return `
+                      <label class="flex items-start gap-3 rounded-2xl border px-3.5 py-3 text-sm transition ${
+                        isLspd
+                          ? 'border-brand-400/30 bg-brand-500/5'
+                          : 'border-white/10 bg-white/[0.02]'
+                      }">
+                        <input
+                          type="checkbox"
+                          name="characterRoleSlug"
+                          value="${escapeAttr(role.slug)}"
+                          class="mt-0.5 rounded border-white/20 bg-surface-950 text-brand-500"
+                          ${checked ? 'checked' : ''}
+                          ${canAssignRoles ? '' : 'disabled'}
+                        />
+                        <span class="min-w-0">
+                          <span class="block font-medium text-white">${escapeHtml(role.name)}</span>
+                          <span class="mt-0.5 block text-xs text-ink-500">${escapeHtml(role.slug)}</span>
+                          ${
+                            isLspd
+                              ? `<span class="mt-1 block text-xs text-brand-200">Directorio LSPD, aptitud y solicitudes de expediente.</span>`
+                              : ''
+                          }
+                        </span>
+                      </label>
+                    `;
+                  })
+                  .join('')
+              : `<p class="text-sm text-ink-400 sm:col-span-2">No se pudo cargar el catálogo de roles.</p>`
+          }
+        </div>
+        ${
+          canAssignRoles
+            ? `
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="submit" class="btn-primary">Guardar roles</button>
+                <p class="text-xs text-ink-500">Después, el personaje debe volver a seleccionar su identidad para refrescar el JWT.</p>
+              </div>
+            `
+            : ''
+        }
+      </form>
+    </section>
+
     ${
       officer
         ? `
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Condecoraciones</h3>
         <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${renderStaffDecorationsGrid(officerDecorations, {
@@ -388,15 +482,15 @@ function renderCharacterDetail(
     ${
       officer && canViewOfficerComplaints
         ? `
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="text-sm font-semibold text-white">Denuncias</h3>
+            <h3 class="text-sm font-semibold text-white">Quejas</h3>
             <p class="mt-1 text-xs text-ink-400">Historial disciplinario del personal (solo autorización).</p>
           </div>
         </div>
         <div id="officer-complaints-root" class="mt-4 overflow-x-auto">
-          <p class="text-sm text-ink-400">Cargando denuncias...</p>
+          <p class="text-sm text-ink-400">Cargando quejas...</p>
         </div>
       </section>
     `
@@ -406,7 +500,7 @@ function renderCharacterDetail(
     ${
       officer && canUpdateOfficer
         ? `
-      <section class="surface-card p-6">
+      <section class="panel p-6">
         <h3 class="text-sm font-semibold text-white">Departamento SAED</h3>
         <p class="mt-1 text-xs text-ink-400">Asignar, cambiar o remover el departamento del personal.</p>
         <form id="department-form" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -432,7 +526,7 @@ function renderCharacterDetail(
     ${
       showPromote
         ? `
-      <section class="surface-card p-6 ${forcePromote ? '' : ''}">
+      <section class="panel p-6 ${forcePromote ? '' : ''}">
         <h3 class="text-sm font-semibold text-white">Promover a personal SAED</h3>
         <p class="mt-1 text-xs text-ink-400">
           Único flujo de ingreso al departamento. Se creará StaffProfile y la organización pasará a <strong class="text-brand-300">SAED</strong>.
@@ -470,12 +564,9 @@ function renderCharacterDetail(
             <div>
               <label class="form-label" for="promote-role">Role RBAC</label>
               <select id="promote-role" class="form-input">
-                <option value="officer">Officer</option>
-                <option value="sergeant">Sergeant</option>
-                <option value="lieutenant">Lieutenant</option>
-                <option value="captain">Captain</option>
-                <option value="commander">Commander</option>
-                <option value="chief">Chief</option>
+                ${MEDICAL_ROLE_OPTIONS.map(
+                  (item) => `<option value="${item.value}">${item.label}</option>`,
+                ).join('')}
                 ${
                   can(PERMISSIONS.ROLES_ASSIGN) || can(PERMISSIONS.ACCOUNTS_MANAGE)
                     ? '<option value="administrator">Administrator</option>'
@@ -498,15 +589,58 @@ function renderCharacterDetail(
 function bindDetailActions(
   root,
   character,
-  { canPromote, canUpdateOfficer, canManageDecorations, canViewOfficerComplaints, load },
+  {
+    canPromote,
+    canUpdateOfficer,
+    canManageDecorations,
+    canAssignRoles = false,
+    canViewOfficerComplaints,
+    load,
+  },
 ) {
   const promoteForm = root.querySelector('#promote-form');
   const departmentForm = root.querySelector('#department-form');
   const awardForm = root.querySelector('#award-decoration-form');
+  const rolesForm = root.querySelector('#character-roles-form');
 
   if (canViewOfficerComplaints && character.staffProfile) {
     void loadOfficerComplaints(root, character.staffProfile.id);
   }
+
+  rolesForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!canAssignRoles) return;
+
+    const roleSlugs = [...root.querySelectorAll('input[name="characterRoleSlug"]:checked')].map(
+      (input) => input.value,
+    );
+
+    if (!roleSlugs.length) {
+      setAuthAlert(root, {
+        id: 'admin-character-detail-alert',
+        type: 'error',
+        message: 'Selecciona al menos un rol. Un personaje siempre debe conservar uno.',
+      });
+      return;
+    }
+
+    try {
+      await setCharacterRoles(character.id, roleSlugs);
+      setAuthAlert(root, {
+        id: 'admin-character-detail-alert',
+        type: 'success',
+        message:
+          'Roles actualizados. El personaje debe cambiar de identidad o volver a entrar para aplicar los permisos.',
+      });
+      await load();
+    } catch (error) {
+      setAuthAlert(root, {
+        id: 'admin-character-detail-alert',
+        type: 'error',
+        message: getApiErrorMessage(error),
+      });
+    }
+  });
 
   promoteForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -631,7 +765,7 @@ async function loadOfficerComplaints(root, staffProfileId) {
               <th class="py-2 pr-4">Estado</th>
               <th class="py-2 pr-4">Fecha</th>
               <th class="py-2 pr-4">Investigador</th>
-              <th class="py-2 pr-4">Denunciante</th>
+              <th class="py-2 pr-4">Quejoso</th>
               <th class="py-2 pr-4">Motivo</th>
               <th class="py-2"></th>
             </tr>
@@ -660,7 +794,7 @@ async function loadOfficerComplaints(root, staffProfileId) {
           </tbody>
         </table>
       `
-      : `<p class="text-sm text-ink-400">Este personal no tiene denuncias registradas.</p>`;
+      : `<p class="text-sm text-ink-400">Este personal no tiene quejas registradas.</p>`;
   } catch (error) {
     host.innerHTML = `<p class="text-sm text-rose-300">${getApiErrorMessage(error)}</p>`;
   }
@@ -731,4 +865,17 @@ function formatDate(value) {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replaceAll('`', '&#96;');
 }

@@ -23,6 +23,11 @@ export function icon(name, className = 'h-5 w-5') {
     chevronDown: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 9 6 6 6-6"/>`,
     home: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/>`,
     book: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>`,
+    cross: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4v16M4 12h16"/>`,
+    heartPulse: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 12h3l2-4 3 8 2-4h8"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19.5 7.5a4 4 0 0 0-5.5-.4L12 8.8l-2-1.7a4 4 0 0 0-5.5.4A4.2 4.2 0 0 0 4 12.2L12 20l8-7.8a4.2 4.2 0 0 0-.5-4.7Z"/>`,
+    building: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 21h16M6 21V7l6-3 6 3v14M9 10h1m4 0h1M9 14h1m4 0h1M9 18h1m4 0h1"/>`,
+    stethoscope: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 4v6a4 4 0 0 0 8 0V4M6 4h2m6 0h2"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 14v2a4 4 0 0 0 4 4h0a3 3 0 1 0 0-6"/>`,
+    calendar: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 3v3m10-3v3M4.5 8.5h15M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 12h2m4 0h2M8 16h2m4 0h2"/>`,
   };
 
   const content = icons[name] ?? '';

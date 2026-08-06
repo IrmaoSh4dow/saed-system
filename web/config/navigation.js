@@ -36,6 +36,43 @@ export const SIDEBAR_NAVIGATION = [
     icon: 'shield',
   },
   {
+    name: 'Turnos',
+    path: '/shifts',
+    permission: PERMISSIONS.SHIFTS_READ,
+    icon: 'heartPulse',
+  },
+  {
+    name: 'Incentivos',
+    path: '/incentives',
+    permission: PERMISSIONS.INCENTIVES_READ,
+    icon: 'bolt',
+  },
+  {
+    name: 'Convenios',
+    path: '/agreements',
+    permission: PERMISSIONS.AGREEMENTS_READ,
+    icon: 'archive',
+  },
+  {
+    name: 'LSPD',
+    path: '/lspd',
+    // High Command (occupational-health.read / finance / review) + LSPD Medical Supervisor (interop)
+    permission: PERMISSIONS.OCCUPATIONAL_HEALTH_INTEROP,
+    anyPermissions: [
+      PERMISSIONS.OCCUPATIONAL_HEALTH_READ,
+      PERMISSIONS.OCCUPATIONAL_HEALTH_INTEROP,
+      PERMISSIONS.LSPD_FINANCE_READ,
+      PERMISSIONS.MEDICAL_RECORD_ACCESS_READ,
+    ],
+    icon: 'shield',
+  },
+  {
+    name: 'Pacientes',
+    path: '/patients',
+    permission: PERMISSIONS.PATIENTS_READ,
+    icon: 'heartPulse',
+  },
+  {
     name: 'Informes',
     path: '/reports',
     permission: PERMISSIONS.REPORTS_READ,
@@ -48,10 +85,32 @@ export const SIDEBAR_NAVIGATION = [
     icon: 'shield',
   },
   {
-    name: 'Denuncias',
+    name: 'Quejas',
     path: '/complaints',
-    permission: PERMISSIONS.COMPLAINTS_READ,
+    // Deputy Medical Director and above only
+    permission: PERMISSIONS.COMPLAINTS_ASSIGN,
+    anyPermissions: [PERMISSIONS.COMPLAINTS_ASSIGN, PERMISSIONS.COMPLAINTS_MANAGE],
     icon: 'alert',
+  },
+  {
+    name: 'Citas',
+    path: '/appointments',
+    permission: PERMISSIONS.APPOINTMENTS_READ,
+    icon: 'calendar',
+  },
+  {
+    name: 'Solicitudes',
+    path: '/admin-requests',
+    // Deputy Medical Director and above only
+    permission: PERMISSIONS.ADMIN_REQUESTS_MANAGE,
+    anyPermissions: [PERMISSIONS.ADMIN_REQUESTS_ASSIGN, PERMISSIONS.ADMIN_REQUESTS_MANAGE],
+    icon: 'archive',
+  },
+  {
+    name: 'Valoraciones',
+    path: '/staff-ratings',
+    permission: PERMISSIONS.STAFF_RATINGS_READ,
+    icon: 'heartPulse',
   },
   {
     name: 'Academia',
@@ -167,6 +226,16 @@ export const ADMIN_NAVIGATION = [
     path: '/admin/gallery',
     permission: PERMISSIONS.GALLERY_MANAGE,
     anyPermissions: [PERMISSIONS.GALLERY_MANAGE, PERMISSIONS.ADMIN_ACCESS],
+  },
+  {
+    name: 'Establecimientos',
+    path: '/admin/establishments',
+    permission: PERMISSIONS.ESTABLISHMENTS_READ,
+    anyPermissions: [
+      PERMISSIONS.ESTABLISHMENTS_READ,
+      PERMISSIONS.ESTABLISHMENTS_MANAGE,
+      PERMISSIONS.ADMIN_ACCESS,
+    ],
   },
 ];
 

@@ -2,36 +2,39 @@ import { icon } from './icons.js';
 
 const BENEFITS = [
   {
-    title: 'Gestión moderna',
+    title: 'Gestión hospitalaria',
     description:
-      'Procesos claros, interfaces rápidas y una experiencia pensada para operar bajo presión.',
-    icon: 'grid',
+      'Departamentos, turnos y flujos clínicos organizados en una interfaz pensada para operar con claridad.',
+    icon: 'building',
   },
   {
-    title: 'Expedientes digitales',
+    title: 'Expedientes médicos',
     description:
-      'Historial profesional completo, trazable y disponible cuando el mando lo necesita.',
+      'Historial clínico digital, trazable y disponible para el personal autorizado en el momento preciso.',
     icon: 'file',
   },
   {
-    title: 'Seguimiento de casos',
+    title: 'Informes clínicos',
     description:
-      'Investigaciones organizadas, estados visibles y asignación controlada por permisos.',
-    icon: 'search',
+      'Consultas, procedimientos y hospitalizaciones documentados con estados visibles y auditoría.',
+    icon: 'stethoscope',
   },
   {
-    title: 'Evidencias centralizadas',
-    description: 'Un único repositorio reutilizable entre informes, casos y denuncias.',
-    icon: 'archive',
+    title: 'Personal y especializaciones',
+    description:
+      'Fichas institucionales, rangos, certificaciones y asignación a departamentos médicos.',
+    icon: 'users',
   },
   {
-    title: 'Comunicación en tiempo real',
-    description: 'Notificaciones y chat operativos sin recargar la aplicación.',
-    icon: 'bolt',
+    title: 'Tiempo real',
+    description:
+      'Notificaciones y actualizaciones instantáneas para mantener al equipo sincronizado.',
+    icon: 'heartPulse',
   },
   {
-    title: 'Seguridad',
-    description: 'Autenticación multi-proveedor, JWT y control de acceso basado en roles.',
+    title: 'Seguridad institucional',
+    description:
+      'Autenticación multi-proveedor, JWT y control de acceso basado en roles del personaje activo.',
     icon: 'lock',
   },
 ];
@@ -42,9 +45,9 @@ export function renderBenefitsSection() {
       <div class="landing-container">
         <div class="mx-auto mb-14 max-w-2xl text-center" data-reveal>
           <p class="landing-eyebrow">Plataforma</p>
-          <h2 class="landing-title">¿Por qué utilizar este sistema?</h2>
+          <h2 class="landing-title">Diseñada para el entorno clínico</h2>
           <p class="landing-lead mx-auto">
-            Una infraestructura diseñada para el Roleplay serio: precisa, segura y preparada para crecer.
+            Una infraestructura moderna para administrar el SAED con el rigor de un sistema hospitalario profesional.
           </p>
         </div>
 
@@ -52,7 +55,7 @@ export function renderBenefitsSection() {
           ${BENEFITS.map(
             (item, index) => `
               <article class="surface-card surface-card-hover p-6" data-reveal data-reveal-delay="${index * 60}">
-                <div class="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-brand-500/20 bg-brand-500/10 text-brand-300">
+                <div class="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
                   ${icon(item.icon, 'h-5 w-5')}
                 </div>
                 <h3 class="text-lg font-semibold text-white">${item.title}</h3>

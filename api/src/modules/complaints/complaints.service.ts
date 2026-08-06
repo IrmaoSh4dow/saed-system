@@ -100,7 +100,11 @@ export class ComplaintsService {
     }
 
     const roles = await this.permissionsService.getRoleSlugsForCharacter(characterId);
-    if (roles.includes('chief') || roles.includes('administrator')) {
+    if (
+      roles.includes('medical-director') ||
+      roles.includes('deputy-medical-director') ||
+      roles.includes('administrator')
+    ) {
       return true;
     }
 
@@ -515,13 +519,36 @@ export class ComplaintsService {
       });
     }
 
+    const payload = {
+      ...message,
+      complaintId: id,
+      caseNumber: complaint.caseNumber,
+      author: message.author
+        ? {
+            ...message.author,
+            fullName: `${message.author.firstName} ${message.author.lastName}`,
+          }
+        : null,
+      createdAt:
+        message.createdAt instanceof Date
+          ? message.createdAt.toISOString()
+          : message.createdAt,
+    };
+
     this.realtimeGateway.emitToRoom(
       `complaint-${complaint.caseNumber}`,
       'complaints:message',
-      message,
+      payload,
     );
+    for (const recipient of recipients) {
+      this.realtimeGateway.emitToCharacter(
+        recipient.characterId,
+        'complaints:message',
+        payload,
+      );
+    }
 
-    return message;
+    return payload;
   }
 
   async addInternalNote(
@@ -670,7 +697,13 @@ export class ComplaintsService {
     const [chiefs, iaOfficers] = await Promise.all([
       this.prismaService.character.findMany({
         where: {
-          roles: { some: { role: { slug: { in: ['chief', 'administrator'] } } } },
+          roles: {
+            some: {
+              role: {
+                slug: { in: ['medical-director', 'deputy-medical-director', 'administrator'] },
+              },
+            },
+          },
         },
         select: { id: true, accountId: true },
       }),

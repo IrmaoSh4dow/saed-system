@@ -1,16 +1,16 @@
 import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js';
+import { initAuthMotion } from '../components/auth/auth-motion.js';
 import { renderSelectField } from '../components/auth/select-field.js';
 import { renderSubmitButton, setButtonLoading } from '../components/auth/submit-button.js';
 import { renderTextField, setFieldError } from '../components/auth/text-field.js';
-import { CIVILIAN_WORKPLACES } from '../config/workplaces.js';
 import { MAX_CHARACTERS_PER_ACCOUNT } from '../config/characters.js';
 import { renderAuthLayout } from '../layouts/auth.layout.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
+import { listWorkplaces } from '../services/characters.service.js';
 import { createCharacterRecord, getCurrentCharacters } from '../services/identity.service.js';
 import { requireAuth } from '../utils/auth-guard.js';
 import { validateImageUploadFile } from '../utils/image-upload.js';
 import { navigate } from '../utils/router.js';
-import { initScrollReveal } from '../utils/scroll-reveal.js';
 
 export function createCharacterPage() {
   if (!requireAuth()) {
@@ -31,7 +31,7 @@ export function createCharacterPage() {
 
   const content = `
     <div class="mx-auto w-full max-w-2xl" data-reveal>
-      <div class="surface-card overflow-hidden p-7 sm:p-9">
+      <div class="panel overflow-hidden p-7 sm:p-9">
         <div class="mb-8">
           <p class="landing-eyebrow">Identidad</p>
           <h1 class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Crear personaje</h1>
@@ -94,10 +94,7 @@ export function createCharacterPage() {
             name: 'organization',
             label: 'Trabajo / organización',
             required: true,
-            options: CIVILIAN_WORKPLACES.map((item) => ({
-              value: item.name,
-              label: item.name,
-            })),
+            options: [{ value: '', label: 'Cargando establecimientos…' }],
           })}
           <p class="form-hint -mt-3">SAED no está disponible aquí. Solo se asigna al ser incorporado a personal médico.</p>
 
@@ -141,9 +138,35 @@ export function createCharacterPage() {
       const previewImage = previewHost?.querySelector('img');
       let avatarFile = null;
       let previewObjectUrl = null;
+      let workplaces = [];
 
-      const cleanups = [initScrollReveal(root)];
-      root.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('is-visible'));
+      const cleanups = [initAuthMotion(root)];
+
+      const loadWorkplaces = async () => {
+        const select = root.querySelector('#organization');
+        if (!select) return;
+        try {
+          const catalog = await listWorkplaces();
+          workplaces = catalog.civilian ?? [];
+          select.innerHTML = workplaces.length
+            ? workplaces
+                .map(
+                  (item) =>
+                    `<option value="${item.name}">${item.name}</option>`,
+                )
+                .join('')
+            : `<option value="">No hay establecimientos disponibles</option>`;
+        } catch (error) {
+          select.innerHTML = `<option value="">Error al cargar establecimientos</option>`;
+          setAuthAlert(root, {
+            id: 'character-alert',
+            type: 'error',
+            message: getApiErrorMessage(error, 'No se pudo cargar el catálogo de establecimientos.'),
+          });
+        }
+      };
+
+      void loadWorkplaces();
 
       const clearPreview = () => {
         if (previewObjectUrl) {
@@ -193,7 +216,7 @@ export function createCharacterPage() {
         const sex = form.sex.value;
         const nationality = form.nationality.value.trim();
         const organization = form.organization.value;
-        const workplace = CIVILIAN_WORKPLACES.find((item) => item.name === organization);
+        const workplace = workplaces.find((item) => item.name === organization);
         let hasError = false;
 
         if (firstName.length < 2) {

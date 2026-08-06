@@ -2,7 +2,7 @@ import { renderAuthAlert, setAuthAlert } from '../components/auth/auth-alert.js'
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import { createComplaint, searchComplaintOfficers } from '../services/complaints.service.js';
-import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
+import { requireActiveCharacter, requireAnyPermission } from '../utils/auth-guard.js';
 import { getApiBaseUrl } from '../utils/env.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 import { navigate } from '../utils/router.js';
@@ -12,7 +12,9 @@ export function createComplaintPage() {
     return { html: '', afterMount: () => {} };
   }
 
-  if (!requirePermission(PERMISSIONS.COMPLAINTS_CREATE)) {
+  if (
+    !requireAnyPermission([PERMISSIONS.COMPLAINTS_ASSIGN, PERMISSIONS.COMPLAINTS_MANAGE])
+  ) {
     return { html: '', afterMount: () => {} };
   }
 
@@ -20,13 +22,13 @@ export function createComplaintPage() {
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'create-complaint-alert' })}
 
-      <section class="surface-card p-5 md:p-6 lg:p-8">
+      <section class="panel p-5 md:p-6 lg:p-8">
         <div class="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div class="min-w-0">
-            <p class="landing-eyebrow">Denuncias</p>
-            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Nueva denuncia</h2>
+            <p class="landing-eyebrow">Quejas</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Nueva queja</h2>
             <p class="mt-2 max-w-2xl text-sm leading-relaxed text-ink-300">
-              Presenta una denuncia contra personal SAED. Debes seleccionar personal existente por nº de empleado o nombre.
+              Presenta una queja contra personal SAED. Debes seleccionar personal existente por nº de empleado o nombre.
             </p>
           </div>
           <a data-link href="/complaints" class="btn-secondary shrink-0 self-start sm:self-auto">Volver al listado</a>
@@ -57,7 +59,7 @@ export function createComplaintPage() {
 
             <div class="space-y-5 lg:col-span-5">
               <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
-                <label class="form-label" for="officer-query">Personal denunciado</label>
+                <label class="form-label" for="officer-query">Personal reportado</label>
                 <div class="mt-2 flex flex-col gap-2 sm:flex-row">
                   <input id="officer-query" class="form-input min-w-0 flex-1" placeholder="Nº de empleado o nombre..." autocomplete="off" />
                   <button type="button" id="officer-search" class="btn-secondary shrink-0">Buscar</button>
@@ -86,7 +88,7 @@ export function createComplaintPage() {
 
           <div class="flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">
             <a data-link href="/complaints" class="btn-secondary text-center">Cancelar</a>
-            <button type="submit" class="btn-primary">Enviar denuncia</button>
+            <button type="submit" class="btn-primary">Enviar queja</button>
           </div>
         </form>
       </section>
@@ -95,12 +97,12 @@ export function createComplaintPage() {
 
   return {
     html: renderDashboardLayout(content, {
-      title: 'Nueva denuncia',
+      title: 'Nueva queja',
       currentPath: '/complaints',
     }),
     afterMount(root) {
       const cleanup = initDashboardLayout(root);
-      document.title = 'Nueva denuncia · SAED';
+      document.title = 'Nueva queja · SAED';
       let imageDataUrl = null;
       let searchTimer = null;
 
