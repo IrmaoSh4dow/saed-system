@@ -682,7 +682,6 @@ async function seed(): Promise<void> {
   }
 
   await pruneOperationalData();
-  await removeNonBaseAccounts();
   await seedTreatments();
 
   console.log('Identity + administrative seed completed');
@@ -694,13 +693,13 @@ async function seed(): Promise<void> {
  * - catalogs: roles, permissions, ranks, departments, licenses, decorations,
  *   treatments, establishments, incentive configuration
  *
- * Controlled by PRUNE_OPERATIONAL_DATA (default: true).
- * Set PRUNE_OPERATIONAL_DATA=false on Railway after the initial cleanup deploy.
+ * Controlled by PRUNE_OPERATIONAL_DATA (default: false).
+ * Set PRUNE_OPERATIONAL_DATA=true only for an intentional one-off cleanup deploy.
  */
 async function pruneOperationalData(): Promise<void> {
-  const enabled = String(process.env.PRUNE_OPERATIONAL_DATA ?? 'true').toLowerCase() !== 'false';
+  const enabled = String(process.env.PRUNE_OPERATIONAL_DATA ?? 'false').toLowerCase() === 'true';
   if (!enabled) {
-    console.log('Skipping operational data prune (PRUNE_OPERATIONAL_DATA=false)');
+    console.log('Skipping operational data prune (PRUNE_OPERATIONAL_DATA is not true)');
     return;
   }
 
@@ -760,6 +759,7 @@ async function pruneOperationalData(): Promise<void> {
     RESTART IDENTITY CASCADE
   `);
 
+  await removeNonBaseAccounts();
   console.log('Operational data pruned');
 }
 

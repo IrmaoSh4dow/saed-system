@@ -6,7 +6,7 @@ buildCommand = "npm run build"
 
 [deploy]
 # Migrate + seed against DATABASE_URL, then bind PORT (see server.cjs).
-# Seed keeps @sh4dow and base catalogs; prunes operational data when enabled.
+# Seed upserts catalogs/@sh4dow; operational prune only if PRUNE_OPERATIONAL_DATA=true.
 startCommand = "npx prisma migrate deploy && npm run prisma:seed && node server.cjs"
 healthcheckPath = "/health"
 healthcheckTimeout = 300

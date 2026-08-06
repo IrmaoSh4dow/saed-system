@@ -32,7 +32,7 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | `API_PREFIX` | No | Default `api/v1` |
 | `PORT` | Inyectada | No hardcodear puerto fijo |
 | `NODE_ENV` | Recomendada | `production` |
-| `PRUNE_OPERATIONAL_DATA` | No | Default `true`. Borra informes, pacientes, citas, quejas, etc. Conserva catálogos y `@sh4dow`. **Pon `false` después del primer deploy limpio.** |
+| `PRUNE_OPERATIONAL_DATA` | No | Default `false`. Solo si es `true` borra informes, pacientes, citas, quejas, etc. (conserva catálogos y `@sh4dow`). |
 | `DISCORD_SHIFTS_WEBHOOK_URL` | No | Webhook de turnos |
 | `PUBLIC_ASSET_BASE_URL` | No | Origen público para assets |
 
@@ -45,15 +45,14 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 - Catálogo de licencias y condecoraciones
 - Tratamientos, establishments, configuración de incentivos
 
-**Se vacía** (si `PRUNE_OPERATIONAL_DATA` ≠ `false`)
+**Se vacía solo si** `PRUNE_OPERATIONAL_DATA=true`
 
 - Pacientes / EMR / facturas clínicas
 - Informes médicos
 - Citas, quejas, solicitudes administrativas
 - Turnos, valoraciones, pagos de incentivos
 - Academia operativa, noticias/galería CMS, convenios, auditoría, notificaciones, refresh tokens
-
-Otras cuentas distintas de `@sh4dow` se eliminan en cada seed.
+- Cuentas distintas de `@sh4dow`
 
 ---
 
@@ -82,8 +81,7 @@ Otras cuentas distintas de `@sh4dow` se eliminan en cada seed.
 2. API `/health` → `nestReady: true`
 3. Login `@sh4dow` + personajes intactos
 4. Sin pacientes/informes residuales de otras cuentas
-5. Cuando el entorno ya esté limpio: `PRUNE_OPERATIONAL_DATA=false` (si no, cada redeploy vacía de nuevo la operativa)
-6. Front sin errores CORS; `FRONTEND_URL` con el dominio real
+5. Front sin errores CORS; `FRONTEND_URL` con el dominio real
 
 ---
 
