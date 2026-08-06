@@ -25,6 +25,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { AcademyModule } from './modules/academy/academy.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { IncentivesModule } from './modules/incentives/incentives.module';
+import { InstitutionalPaymentsModule } from './modules/institutional-payments/institutional-payments.module';
 import { AdminRequestsModule } from './modules/admin-requests/admin-requests.module';
 import { EstablishmentsModule } from './modules/establishments/establishments.module';
 import { AgreementsModule } from './modules/agreements/agreements.module';
@@ -55,6 +56,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     AdminRequestsModule,
     EstablishmentsModule,
     AgreementsModule,
+    InstitutionalPaymentsModule,
     OccupationalHealthModule,
     StaffRatingsModule,
     PatientsModule,

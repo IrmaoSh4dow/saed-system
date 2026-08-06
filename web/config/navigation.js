@@ -113,6 +113,16 @@ export const SIDEBAR_NAVIGATION = [
     icon: 'heartPulse',
   },
   {
+    name: 'Pagos institucionales',
+    path: '/admin/institutional-payments',
+    permission: PERMISSIONS.INSTITUTIONAL_PAYMENTS_READ,
+    anyPermissions: [
+      PERMISSIONS.INSTITUTIONAL_PAYMENTS_READ,
+      PERMISSIONS.INSTITUTIONAL_PAYMENTS_CREATE,
+    ],
+    icon: 'archive',
+  },
+  {
     name: 'Academia',
     path: '/academy',
     permission: PERMISSIONS.ACADEMY_READ,
@@ -238,6 +248,16 @@ export const ADMIN_NAVIGATION = [
     anyPermissions: [
       PERMISSIONS.ESTABLISHMENTS_READ,
       PERMISSIONS.ESTABLISHMENTS_MANAGE,
+      PERMISSIONS.ADMIN_ACCESS,
+    ],
+  },
+  {
+    name: 'Pagos institucionales',
+    path: '/admin/institutional-payments',
+    permission: PERMISSIONS.INSTITUTIONAL_PAYMENTS_READ,
+    anyPermissions: [
+      PERMISSIONS.INSTITUTIONAL_PAYMENTS_READ,
+      PERMISSIONS.INSTITUTIONAL_PAYMENTS_CREATE,
       PERMISSIONS.ADMIN_ACCESS,
     ],
   },

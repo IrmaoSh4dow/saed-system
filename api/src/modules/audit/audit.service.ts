@@ -25,6 +25,7 @@ export const AUDIT_TARGET = {
   STAFF_RATING: 'StaffRating',
   PATIENT: 'Patient',
   PATIENT_INVOICE: 'PatientInvoice',
+  INSTITUTIONAL_PAYMENT: 'InstitutionalPayment',
 } as const;
 
 export interface ICreateAuditLogInput {
