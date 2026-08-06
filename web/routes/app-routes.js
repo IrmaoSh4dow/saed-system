@@ -33,6 +33,7 @@ import {
   academyApplyPage,
   academyTransferApplyPage,
 } from '../pages/academy-applications.page.js';
+import { regulationsPage } from '../pages/regulations.page.js';
 import { shiftsPage } from '../pages/shifts.page.js';
 import { incentivesPage } from '../pages/incentives.page.js';
 import { adminRequestsPage } from '../pages/admin-requests.page.js';
@@ -183,6 +184,11 @@ export const privateRoutes = [
     path: '/reports/all',
     handler: allReportsPage,
     permission: PERMISSIONS.REPORTS_READ,
+  },
+  {
+    path: '/regulations',
+    handler: regulationsPage,
+    permission: PERMISSIONS.REGULATIONS_READ,
   },
   {
     path: '/academy',

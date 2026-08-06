@@ -123,11 +123,22 @@ export const SIDEBAR_NAVIGATION = [
     icon: 'archive',
   },
   {
+    name: 'Reglamento',
+    path: '/regulations',
+    permission: PERMISSIONS.REGULATIONS_READ,
+    anyPermissions: [
+      PERMISSIONS.REGULATIONS_READ,
+      PERMISSIONS.REGULATIONS_CREATE,
+      PERMISSIONS.REGULATIONS_UPDATE,
+    ],
+    icon: 'book',
+  },
+  {
     name: 'Academia',
     path: '/academy',
     permission: PERMISSIONS.ACADEMY_READ,
     anyPermissions: [PERMISSIONS.ACADEMY_READ, PERMISSIONS.ACADEMY_MANAGE, PERMISSIONS.ADMIN_ACCESS],
-    icon: 'book',
+    icon: 'file',
   },
   {
     name: 'Postulaciones',

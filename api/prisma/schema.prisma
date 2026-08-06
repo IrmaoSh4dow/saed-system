@@ -408,6 +408,10 @@ model Character {
   institutionalPaymentsCreated InstitutionalPayment[] @relation("InstitutionalPaymentCreatedBy")
   institutionalPaymentsUpdated InstitutionalPayment[] @relation("InstitutionalPaymentUpdatedBy")
   institutionalPaymentsVoided  InstitutionalPayment[] @relation("InstitutionalPaymentVoidedBy")
+  regulationDocumentsAuthored  RegulationDocument[] @relation("RegulationDocumentAuthor")
+  regulationDocumentsEdited    RegulationDocument[] @relation("RegulationDocumentLastEditor")
+  regulationVersionsCreated    RegulationDocumentVersion[] @relation("RegulationVersionCreatedBy")
+  regulationAttachmentsUploaded RegulationAttachment[] @relation("RegulationAttachmentUploadedBy")
   incentivePaymentsMade      IncentivePayment[]   @relation("IncentivePaidBy")
   incentiveConfigurationsUpdated IncentiveConfiguration[] @relation("IncentiveConfigUpdatedBy")
   adminRequestsFiled         AdminRequest[]              @relation("AdminRequestRequester")
@@ -1722,4 +1726,90 @@ model AdminRequestEvent {
   createdAt      DateTime              @default(now())
 
   @@index([adminRequestId, createdAt])
+}
+
+/// Institutional documentation library (regulations, protocols, manuals).
+enum RegulationDocumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model RegulationCategory {
+  id          String               @id @default(uuid())
+  name        String               @unique
+  slug        String               @unique
+  description String?
+  sortOrder   Int                  @default(0)
+  isActive    Boolean              @default(true)
+  documents   RegulationDocument[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model RegulationDocument {
+  id                   String                   @id @default(uuid())
+  categoryId           String
+  category             RegulationCategory       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  title                String
+  slug                 String                   @unique
+  summary              String?
+  /// Current HTML body (sanitized on write).
+  contentHtml          String                   @db.Text
+  /// Plain-text extract for search.
+  contentText          String                   @db.Text
+  status               RegulationDocumentStatus @default(DRAFT)
+  versionNumber        Int                      @default(1)
+  authorCharacterId    String?
+  authorCharacter      Character?               @relation("RegulationDocumentAuthor", fields: [authorCharacterId], references: [id], onDelete: SetNull)
+  lastEditorCharacterId String?
+  lastEditorCharacter  Character?               @relation("RegulationDocumentLastEditor", fields: [lastEditorCharacterId], references: [id], onDelete: SetNull)
+  publishedAt          DateTime?
+  versions             RegulationDocumentVersion[]
+  attachments          RegulationAttachment[]
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  @@index([categoryId, status])
+  @@index([status, updatedAt])
+  @@index([title])
+  @@index([authorCharacterId])
+}
+
+/// Immutable snapshot created on each meaningful content change.
+model RegulationDocumentVersion {
+  id                   String                   @id @default(uuid())
+  documentId           String
+  document             RegulationDocument       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber        Int
+  title                String
+  summary              String?
+  contentHtml          String                   @db.Text
+  contentText          String                   @db.Text
+  status               RegulationDocumentStatus
+  changeSummary        String?
+  createdByCharacterId String?
+  createdByCharacter   Character?               @relation("RegulationVersionCreatedBy", fields: [createdByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime                 @default(now())
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, createdAt])
+}
+
+model RegulationAttachment {
+  id                   String             @id @default(uuid())
+  documentId           String
+  document             RegulationDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fileName             String
+  fileUrl              String
+  mimeType             String
+  sizeBytes            Int
+  sortOrder            Int                @default(0)
+  uploadedByCharacterId String?
+  uploadedByCharacter  Character?         @relation("RegulationAttachmentUploadedBy", fields: [uploadedByCharacterId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+
+  @@index([documentId, sortOrder])
 }

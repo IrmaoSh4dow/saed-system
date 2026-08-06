@@ -11,8 +11,24 @@ const ALLOWED_IMAGE_MIME = new Set([
   'image/gif',
 ]);
 
+const ALLOWED_DOCUMENT_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+]);
+
 /** Global max size for all image uploads (multipart and data-URL), 8 MB. */
 export const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+/** Max size for institutional document attachments (PDF/DOC/images), 15 MB. */
+export const MAX_DOCUMENT_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 /**
  * Max length for Base64 data-URL fields in DTOs (~8 MB decoded + prefix).
@@ -53,6 +69,40 @@ export class MediaStorageService {
     }
 
     return this.writeBuffer(file.buffer, mime, folder, entityId);
+  }
+
+  /**
+   * Persists a multipart document/image under /uploads/{folder}/...
+   * Supports PDF and common office formats used by institutional regulations.
+   */
+  saveUploadedDocument(
+    file: { buffer: Buffer; mimetype: string; originalname?: string; size?: number },
+    folder: string,
+    entityId?: string,
+  ): { fileUrl: string; mimeType: string; sizeBytes: number; fileName: string } {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Empty upload');
+    }
+
+    const mime = (file.mimetype || '').toLowerCase();
+    if (!ALLOWED_DOCUMENT_MIME.has(mime)) {
+      throw new BadRequestException(
+        'Solo se permiten PDF, imágenes o documentos Office (DOC/DOCX/XLS/XLSX/TXT)',
+      );
+    }
+
+    const size = file.size ?? file.buffer.byteLength;
+    if (size > MAX_DOCUMENT_UPLOAD_BYTES) {
+      throw new BadRequestException('El tamaño máximo permitido es de 15 MB.');
+    }
+
+    const fileUrl = this.writeBuffer(file.buffer, mime, folder, entityId, file.originalname);
+    return {
+      fileUrl,
+      mimeType: mime,
+      sizeBytes: size,
+      fileName: (file.originalname || 'documento').slice(0, 180),
+    };
   }
 
   /**
@@ -113,13 +163,17 @@ export class MediaStorageService {
     mime: string,
     folder: string,
     entityId?: string,
+    originalName?: string,
   ): string {
     const uploadRoot = join(process.cwd(), 'uploads', folder);
     if (!existsSync(uploadRoot)) {
       mkdirSync(uploadRoot, { recursive: true });
     }
 
-    const extension = mimeToExtension(mime);
+    const extension =
+      mimeToExtension(mime) ||
+      (originalName ? extname(originalName).toLowerCase() : '') ||
+      '.bin';
     const hash = createHash('sha1').update(buffer).digest('hex').slice(0, 12);
     const fileName = `${entityId ?? randomUUID()}-${hash}${extension}`;
     writeFileSync(join(uploadRoot, fileName), buffer);
@@ -138,7 +192,19 @@ function mimeToExtension(mime: string): string {
       return '.webp';
     case 'image/gif':
       return '.gif';
+    case 'application/pdf':
+      return '.pdf';
+    case 'application/msword':
+      return '.doc';
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      return '.docx';
+    case 'application/vnd.ms-excel':
+      return '.xls';
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      return '.xlsx';
+    case 'text/plain':
+      return '.txt';
     default:
-      return extname(mime) || '.bin';
+      return '';
   }
 }
