@@ -9,28 +9,32 @@ import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, CharacterGuard)
-@RequireCharacter(false)
+@RequireCharacter(true)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
   list(
     @CurrentAccount() account: IAuthAccount,
-    @CurrentCharacter() character: IAuthCharacter | null,
+    @CurrentCharacter() character: IAuthCharacter,
   ) {
-    return this.notificationsService.listForAccount(account.id, character?.id);
+    return this.notificationsService.listForCharacter(account.id, character.id);
   }
 
   @Patch('read-all')
-  markAll(@CurrentAccount() account: IAuthAccount) {
-    return this.notificationsService.markAllAsRead(account.id);
+  markAll(
+    @CurrentAccount() account: IAuthAccount,
+    @CurrentCharacter() character: IAuthCharacter,
+  ) {
+    return this.notificationsService.markAllAsRead(account.id, character.id);
   }
 
   @Patch(':id/read')
   markOne(
     @CurrentAccount() account: IAuthAccount,
+    @CurrentCharacter() character: IAuthCharacter,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.notificationsService.markAsRead(account.id, id);
+    return this.notificationsService.markAsRead(account.id, character.id, id);
   }
 }

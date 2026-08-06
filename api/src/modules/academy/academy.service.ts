@@ -791,21 +791,20 @@ export class AcademyService {
         },
       });
 
-      await this.notificationsService.create({
-        accountId: updated.characterId
-          ? (
-              await this.prismaService.character.findUniqueOrThrow({
-                where: { id: updated.characterId },
-                select: { accountId: true },
-              })
-            ).accountId
-          : actor.accountId,
-        characterId: updated.characterId,
-        type: NotificationType.ACADEMY_APPLICATION_REJECTED,
-        title: 'Postulación rechazada',
-        body: dto.reviewNotes?.trim() || 'Tu solicitud ha sido rechazada.',
-        href: '/academy/applications',
-      });
+      if (updated.characterId) {
+        const recipient = await this.prismaService.character.findUniqueOrThrow({
+          where: { id: updated.characterId },
+          select: { accountId: true },
+        });
+        await this.notificationsService.create({
+          accountId: recipient.accountId,
+          characterId: updated.characterId,
+          type: NotificationType.ACADEMY_APPLICATION_REJECTED,
+          title: 'Postulación rechazada',
+          body: dto.reviewNotes?.trim() || 'Tu solicitud ha sido rechazada.',
+          href: '/academy/applications',
+        });
+      }
 
       return updated;
     }

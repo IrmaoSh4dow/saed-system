@@ -48,7 +48,7 @@ export class AdminRequestsController {
   }
 
   @Get('assignees/search')
-  @Permissions('admin-requests.read')
+  @Permissions('admin-requests.assign')
   searchAssignees(@Query('q') query = '') {
     return this.adminRequestsService.searchAssignees(query);
   }
@@ -95,7 +95,7 @@ export class AdminRequestsController {
   }
 
   @Patch(':id/status')
-  @Permissions('admin-requests.read')
+  @Permissions('admin-requests.manage')
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,
@@ -111,7 +111,7 @@ export class AdminRequestsController {
   }
 
   @Patch(':id/priority')
-  @Permissions('admin-requests.read')
+  @Permissions('admin-requests.manage')
   updatePriority(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,
@@ -127,7 +127,7 @@ export class AdminRequestsController {
   }
 
   @Post(':id/assignments')
-  @Permissions('admin-requests.read')
+  @Permissions('admin-requests.assign')
   assign(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,
@@ -159,7 +159,7 @@ export class AdminRequestsController {
   }
 
   @Post(':id/notes')
-  @Permissions('admin-requests.read')
+  @Permissions('admin-requests.manage')
   addNote(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,

@@ -16,12 +16,7 @@ export function createAdminRequestPage() {
   if (!requireActiveCharacter()) {
     return { html: '', afterMount: () => {} };
   }
-  if (
-    !requireAnyPermission([
-      PERMISSIONS.ADMIN_REQUESTS_ASSIGN,
-      PERMISSIONS.ADMIN_REQUESTS_MANAGE,
-    ])
-  ) {
+  if (!requireAnyPermission([PERMISSIONS.ADMIN_REQUESTS_CREATE])) {
     return { html: '', afterMount: () => {} };
   }
 

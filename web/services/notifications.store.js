@@ -1,28 +1,42 @@
 import { apiClient } from './api-client.js';
 import { APP_EVENTS, emit } from './app-events.js';
+import { getCurrentActiveCharacter } from './identity.service.js';
 import { isApiAuthEnabled } from '../utils/env.js';
 import { connectSocket, getSocket } from './socket-client.js';
 
-const NOTIFICATIONS_KEY = 'saed.notifications';
+const LEGACY_NOTIFICATIONS_KEY = 'saed.notifications';
 
 export async function listNotifications() {
+  const characterId = getActiveCharacterId();
+  if (!characterId) {
+    clearLegacyCache();
+    emit(APP_EVENTS.NOTIFICATIONS_UPDATED, []);
+    return [];
+  }
+
   if (isApiAuthEnabled()) {
     try {
       const response = await apiClient.get('/notifications');
-      const items = unwrap(response).map(normalizeNotification);
-      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(items));
+      const items = unwrap(response)
+        .map(normalizeNotification)
+        .filter((item) => matchesActiveCharacter(item, characterId));
+      saveLocal(characterId, items);
       emit(APP_EVENTS.NOTIFICATIONS_UPDATED, items);
       return items;
     } catch {
-      return getLocalNotifications();
+      return getLocalNotifications(characterId);
     }
   }
 
-  return getLocalNotifications();
+  return getLocalNotifications(characterId);
 }
 
 export function getNotifications() {
-  return getLocalNotifications();
+  const characterId = getActiveCharacterId();
+  if (!characterId) {
+    return [];
+  }
+  return getLocalNotifications(characterId);
 }
 
 export function getUnreadNotificationsCount() {
@@ -30,6 +44,11 @@ export function getUnreadNotificationsCount() {
 }
 
 export async function markNotificationAsRead(notificationId) {
+  const characterId = getActiveCharacterId();
+  if (!characterId) {
+    return [];
+  }
+
   if (isApiAuthEnabled()) {
     try {
       await apiClient.patch(`/notifications/${notificationId}/read`);
@@ -38,15 +57,20 @@ export async function markNotificationAsRead(notificationId) {
     }
   }
 
-  const notifications = getLocalNotifications().map((item) =>
+  const notifications = getLocalNotifications(characterId).map((item) =>
     item.id === notificationId ? { ...item, isRead: true } : item,
   );
-  saveLocal(notifications);
+  saveLocal(characterId, notifications);
   emit(APP_EVENTS.NOTIFICATIONS_UPDATED, notifications);
   return notifications;
 }
 
 export async function markAllNotificationsAsRead() {
+  const characterId = getActiveCharacterId();
+  if (!characterId) {
+    return [];
+  }
+
   if (isApiAuthEnabled()) {
     try {
       await apiClient.patch('/notifications/read-all');
@@ -55,10 +79,22 @@ export async function markAllNotificationsAsRead() {
     }
   }
 
-  const notifications = getLocalNotifications().map((item) => ({ ...item, isRead: true }));
-  saveLocal(notifications);
+  const notifications = getLocalNotifications(characterId).map((item) => ({
+    ...item,
+    isRead: true,
+  }));
+  saveLocal(characterId, notifications);
   emit(APP_EVENTS.NOTIFICATIONS_UPDATED, notifications);
   return notifications;
+}
+
+/**
+ * Clears in-memory/local cache for the previous character and reloads for the active one.
+ */
+export function resetNotificationsForActiveCharacter() {
+  clearLegacyCache();
+  emit(APP_EVENTS.NOTIFICATIONS_UPDATED, []);
+  return listNotifications();
 }
 
 export function bindNotificationSocket() {
@@ -72,10 +108,19 @@ export function bindNotificationSocket() {
   }
 
   const onNew = (payload) => {
+    const characterId = getActiveCharacterId();
+    if (!characterId) {
+      return;
+    }
+
     const item = normalizeNotification(payload);
-    const current = getLocalNotifications().filter((entry) => entry.id !== item.id);
+    if (!matchesActiveCharacter(item, characterId)) {
+      return;
+    }
+
+    const current = getLocalNotifications(characterId).filter((entry) => entry.id !== item.id);
     const next = [item, ...current].slice(0, 50);
-    saveLocal(next);
+    saveLocal(characterId, next);
     emit(APP_EVENTS.NOTIFICATIONS_UPDATED, next);
   };
 
@@ -87,26 +132,55 @@ export function bindNotificationSocket() {
   };
 }
 
-function getLocalNotifications() {
+function getActiveCharacterId() {
   try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    return getCurrentActiveCharacter()?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function storageKey(characterId) {
+  return `saed.notifications.${characterId}`;
+}
+
+function getLocalNotifications(characterId) {
+  try {
+    const raw = localStorage.getItem(storageKey(characterId));
     if (!raw) {
       return [];
     }
-    return JSON.parse(raw);
+    return JSON.parse(raw).filter((item) => matchesActiveCharacter(item, characterId));
   } catch {
     return [];
   }
 }
 
-function saveLocal(notifications) {
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
+function saveLocal(characterId, notifications) {
+  localStorage.setItem(storageKey(characterId), JSON.stringify(notifications));
+  clearLegacyCache();
   return notifications;
+}
+
+function clearLegacyCache() {
+  localStorage.removeItem(LEGACY_NOTIFICATIONS_KEY);
+}
+
+function matchesActiveCharacter(item, characterId) {
+  if (!characterId) {
+    return false;
+  }
+  // Legacy cached rows without characterId are treated as unsafe and ignored.
+  if (!item.characterId) {
+    return false;
+  }
+  return item.characterId === characterId;
 }
 
 function normalizeNotification(item) {
   return {
     id: item.id,
+    characterId: item.characterId ?? null,
     title: item.title,
     message: item.body ?? item.message ?? '',
     body: item.body ?? item.message ?? '',

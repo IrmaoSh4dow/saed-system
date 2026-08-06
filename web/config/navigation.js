@@ -102,9 +102,14 @@ export const SIDEBAR_NAVIGATION = [
   {
     name: 'Solicitudes',
     path: '/admin-requests',
-    // Deputy Medical Director and above only
-    permission: PERMISSIONS.ADMIN_REQUESTS_MANAGE,
-    anyPermissions: [PERMISSIONS.ADMIN_REQUESTS_ASSIGN, PERMISSIONS.ADMIN_REQUESTS_MANAGE],
+    // All characters: view/create own requests. Manage/assign remain RBAC-gated in the page.
+    permission: PERMISSIONS.ADMIN_REQUESTS_READ,
+    anyPermissions: [
+      PERMISSIONS.ADMIN_REQUESTS_READ,
+      PERMISSIONS.ADMIN_REQUESTS_CREATE,
+      PERMISSIONS.ADMIN_REQUESTS_ASSIGN,
+      PERMISSIONS.ADMIN_REQUESTS_MANAGE,
+    ],
     icon: 'archive',
   },
   {

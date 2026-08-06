@@ -71,6 +71,8 @@ export function adminRequestsPage() {
   }
   if (
     !requireAnyPermission([
+      PERMISSIONS.ADMIN_REQUESTS_READ,
+      PERMISSIONS.ADMIN_REQUESTS_CREATE,
       PERMISSIONS.ADMIN_REQUESTS_ASSIGN,
       PERMISSIONS.ADMIN_REQUESTS_MANAGE,
     ])

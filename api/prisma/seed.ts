@@ -159,9 +159,9 @@ const PERMISSIONS = [
   { key: 'appointments.create', description: 'Create appointments' },
   { key: 'appointments.manage', description: 'Manage appointments (Medical Director)' },
   { key: 'appointments.assign', description: 'Assign staff to appointments' },
-  { key: 'admin-requests.read', description: 'View administrative requests (High Command)' },
-  { key: 'admin-requests.create', description: 'Create administrative requests (High Command)' },
-  { key: 'admin-requests.manage', description: 'Manage administrative requests (High Command)' },
+  { key: 'admin-requests.read', description: 'View own administrative requests (all characters)' },
+  { key: 'admin-requests.create', description: 'Create administrative requests (all characters)' },
+  { key: 'admin-requests.manage', description: 'Manage all administrative requests (High Command)' },
   { key: 'admin-requests.assign', description: 'Assign administrative requests (High Command)' },
   { key: 'decorations.read', description: 'View decorations' },
   { key: 'decorations.manage', description: 'Manage decorations catalog and awards' },
@@ -247,6 +247,8 @@ const CIVILIAN_CORE = [
   'staff-ratings.create',
   'appointments.read',
   'appointments.create',
+  'admin-requests.read',
+  'admin-requests.create',
   'employment-change.create',
   'employment-change.read',
 ] as const;
@@ -316,12 +318,11 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'occupations.read',
   'admin.access',
   'audit.read',
-  // Quejas / Solicitudes / LSPD — High Command and above only
+  // Quejas / gestión de solicitudes / LSPD — High Command and above only
+  // (admin-requests.read/create already in CIVILIAN_CORE for every character)
   'complaints.read',
   'complaints.create',
   'complaints.assign',
-  'admin-requests.read',
-  'admin-requests.create',
   'admin-requests.assign',
   'admin-requests.manage',
   'occupational-health.read',
@@ -387,6 +388,8 @@ const LSPD_MEDICAL_SUPERVISOR_PERMISSIONS = [
   'medical-record-access.read',
   'medical-record-access.request',
   'medical-report-access.read',
+  'admin-requests.read',
+  'admin-requests.create',
   'employment-change.create',
   'employment-change.read',
 ] as const;

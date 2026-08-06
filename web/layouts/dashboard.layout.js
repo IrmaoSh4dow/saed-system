@@ -1,7 +1,10 @@
 import { initNavbar, renderNavbar } from '../components/dashboard/navbar.js';
 import { initSidebar, renderSidebar } from '../components/dashboard/sidebar.js';
 import { APP_EVENTS, subscribe } from '../services/app-events.js';
-import { bindNotificationSocket } from '../services/notifications.store.js';
+import {
+  bindNotificationSocket,
+  resetNotificationsForActiveCharacter,
+} from '../services/notifications.store.js';
 import { reconnectSocketWithAuth } from '../services/socket-client.js';
 
 export function renderDashboardLayout(
@@ -26,6 +29,7 @@ export function renderDashboardLayout(
 export function initDashboardLayout(root = document) {
   const offCharacterChanged = subscribe(APP_EVENTS.CHARACTER_CHANGED, () => {
     reconnectSocketWithAuth();
+    void resetNotificationsForActiveCharacter();
   });
   const cleanups = [
     initSidebar(root),

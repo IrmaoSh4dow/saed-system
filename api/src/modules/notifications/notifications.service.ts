@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 export interface ICreateNotificationInput {
   accountId: string;
-  characterId?: string | null;
+  characterId: string;
   type: NotificationType;
   title: string;
   body: string;
@@ -21,10 +21,14 @@ export class NotificationsService {
   ) {}
 
   async create(input: ICreateNotificationInput) {
+    if (!input.characterId) {
+      throw new BadRequestException('Notifications must target a character');
+    }
+
     const notification = await this.prismaService.notification.create({
       data: {
         accountId: input.accountId,
-        characterId: input.characterId ?? null,
+        characterId: input.characterId,
         type: input.type,
         title: input.title,
         body: input.body,
@@ -33,14 +37,12 @@ export class NotificationsService {
       },
     });
 
-    this.realtimeGateway.emitToAccount(input.accountId, 'notifications:new', notification);
-    if (input.characterId) {
-      this.realtimeGateway.emitToCharacter(
-        input.characterId,
-        'notifications:new',
-        notification,
-      );
-    }
+    // Character room only — never account room (same account can hold multiple characters).
+    this.realtimeGateway.emitToCharacter(
+      input.characterId,
+      'notifications:new',
+      notification,
+    );
 
     return notification;
   }
@@ -53,23 +55,23 @@ export class NotificationsService {
     return results;
   }
 
-  listForAccount(accountId: string, characterId?: string | null) {
+  listForCharacter(accountId: string, characterId: string) {
     return this.prismaService.notification.findMany({
       where: {
         accountId,
-        OR: [{ characterId: null }, ...(characterId ? [{ characterId }] : [])],
+        characterId,
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
   }
 
-  async markAsRead(accountId: string, notificationId: string) {
+  async markAsRead(accountId: string, characterId: string, notificationId: string) {
     const existing = await this.prismaService.notification.findFirst({
-      where: { id: notificationId, accountId },
+      where: { id: notificationId, accountId, characterId },
     });
     if (!existing) {
-      return null;
+      throw new NotFoundException('Notification was not found');
     }
 
     return this.prismaService.notification.update({
@@ -78,9 +80,9 @@ export class NotificationsService {
     });
   }
 
-  markAllAsRead(accountId: string) {
+  markAllAsRead(accountId: string, characterId: string) {
     return this.prismaService.notification.updateMany({
-      where: { accountId, isRead: false },
+      where: { accountId, characterId, isRead: false },
       data: { isRead: true, readAt: new Date() },
     });
   }
