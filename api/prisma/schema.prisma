@@ -239,6 +239,23 @@ enum AcademyApplicationStatus {
   WITHDRAWN
 }
 
+/// Persistent intake switch per application type (Academia, Traslado, …).
+model ApplicationConfiguration {
+  id                  String                 @id @default(uuid())
+  type                AcademyApplicationType @unique
+  isOpen              Boolean                @default(false)
+  openedByCharacterId String?
+  openedByCharacter   Character?             @relation("ApplicationConfigOpenedBy", fields: [openedByCharacterId], references: [id], onDelete: SetNull)
+  closedByCharacterId String?
+  closedByCharacter   Character?             @relation("ApplicationConfigClosedBy", fields: [closedByCharacterId], references: [id], onDelete: SetNull)
+  openedAt            DateTime?
+  closedAt            DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([isOpen])
+}
+
 enum DepartmentOpeningStatus {
   OPEN
   CLOSED
@@ -405,6 +422,8 @@ model Character {
   medicalRecordAccessRequestsFiled    MedicalRecordAccessRequest[] @relation("MedicalRecordAccessRequester")
   medicalRecordAccessRequestsReviewed MedicalRecordAccessRequest[] @relation("MedicalRecordAccessReviewer")
   staffRatingsGiven                   StaffRating[]                @relation("StaffRatingReviewer")
+  applicationConfigsOpened            ApplicationConfiguration[]   @relation("ApplicationConfigOpenedBy")
+  applicationConfigsClosed            ApplicationConfiguration[]   @relation("ApplicationConfigClosedBy")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -1535,6 +1554,8 @@ model AcademyApplication {
   status                AcademyApplicationStatus @default(PENDING)
   characterId           String
   character             Character                @relation("AcademyApplicationApplicant", fields: [characterId], references: [id], onDelete: Cascade)
+  /// Discord username for SAED contact (not Discord snowflake ID).
+  discordUsername       String?
   formData              Json
   internalNotes         String?
   reviewNotes           String?

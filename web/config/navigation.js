@@ -213,7 +213,11 @@ export const ADMIN_NAVIGATION = [
     name: 'Postulaciones',
     path: '/admin/academy/applications',
     permission: PERMISSIONS.ACADEMY_APPLICATIONS,
-    anyPermissions: [PERMISSIONS.ACADEMY_APPLICATIONS, PERMISSIONS.ADMIN_ACCESS],
+    anyPermissions: [
+      PERMISSIONS.ACADEMY_APPLICATIONS,
+      PERMISSIONS.APPLICATIONS_MANAGE,
+      PERMISSIONS.ADMIN_ACCESS,
+    ],
   },
   {
     name: 'Noticias',

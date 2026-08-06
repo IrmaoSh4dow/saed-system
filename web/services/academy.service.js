@@ -50,6 +50,28 @@ export async function listMyAcademyApplications() {
   return unwrap(response);
 }
 
+export async function listAcademyIntake() {
+  const response = await apiClient.get('/academy/intake');
+  return unwrap(response);
+}
+
+export async function listApplicationConfigurations() {
+  const response = await apiClient.get('/academy/applications/configurations');
+  return unwrap(response);
+}
+
+export async function getApplicationStats() {
+  const response = await apiClient.get('/academy/applications/stats');
+  return unwrap(response);
+}
+
+export async function setApplicationIntake(type, isOpen) {
+  const response = await apiClient.patch(`/academy/applications/configurations/${type}`, {
+    isOpen,
+  });
+  return unwrap(response);
+}
+
 export async function listAcademyApplications(params = {}) {
   const response = await apiClient.get('/academy/applications', { params });
   return unwrap(response);

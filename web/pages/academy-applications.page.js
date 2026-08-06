@@ -4,6 +4,7 @@ import { getAuthState } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
 import {
   createAcademyApplication,
+  listAcademyIntake,
   listMyAcademyApplications,
 } from '../services/academy.service.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
@@ -20,9 +21,14 @@ const TYPE_LABELS = {
 const STATUS_LABELS = {
   PENDING: 'Pendiente',
   UNDER_REVIEW: 'En revisión',
-  ACCEPTED: 'Aceptada',
+  ACCEPTED: 'Aprobada',
   REJECTED: 'Rechazada',
-  WITHDRAWN: 'Retirada',
+  WITHDRAWN: 'Cancelada',
+};
+
+const TYPE_DESCRIPTIONS = {
+  ACADEMY: 'Ingreso a la Academia Médica del SAED.',
+  TRANSFER: 'Traslado desde otra jurisdicción o departamento.',
 };
 
 export function academyApplicationsPage() {
@@ -43,18 +49,17 @@ export function academyApplicationsPage() {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'academy-apps-alert' })}
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="landing-eyebrow">Ingreso</p>
-          <h2 class="mt-1 text-2xl font-semibold text-white">Postulaciones</h2>
-          <p class="mt-2 max-w-2xl text-sm text-ink-300">Consulta el estado de tus solicitudes o inicia una nueva.</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <a data-link href="/academy/apply" class="btn-primary">Postulación a Academia</a>
-          <a data-link href="/academy/apply/transfer" class="btn-secondary">Solicitud de Traslado</a>
-        </div>
+      <div>
+        <p class="landing-eyebrow">Ingreso</p>
+        <h2 class="mt-1 text-2xl font-semibold text-white">Postulaciones</h2>
+        <p class="mt-2 max-w-2xl text-sm text-ink-300">
+          Consulta el estado de las convocatorias y de tus solicitudes.
+        </p>
       </div>
-      <div id="academy-apps-root"><p class="text-sm text-ink-400">Cargando...</p></div>
+      <section id="academy-intake-root" class="grid gap-4 md:grid-cols-2">
+        <p class="text-sm text-ink-400 md:col-span-2">Cargando convocatorias…</p>
+      </section>
+      <div id="academy-apps-root"><p class="text-sm text-ink-400">Cargando tus postulaciones…</p></div>
     </div>
   `;
 
@@ -66,38 +71,81 @@ export function academyApplicationsPage() {
     afterMount(root) {
       const cleanup = initDashboardLayout(root);
 
-      void listMyAcademyApplications()
-        .then((items) => {
-          const host = root.querySelector('#academy-apps-root');
-          if (!host) return;
-          host.innerHTML = `
-            <section class="panel p-5">
-              <div class="space-y-3">
-                ${
-                  items.length
-                    ? items
-                        .map(
-                          (item) => `
-                        <div class="rounded-xl border border-white/10 px-4 py-3">
-                          <div class="flex flex-wrap items-center justify-between gap-2">
-                            <p class="text-sm font-medium text-white">${TYPE_LABELS[item.type] ?? item.type}</p>
-                            <span class="text-xs text-ink-400">${STATUS_LABELS[item.status] ?? item.status}</span>
-                          </div>
-                          <p class="mt-1 text-xs text-ink-500">${formatDateTimeLabel(item.createdAt)}</p>
-                          ${
-                            item.reviewNotes
-                              ? `<p class="mt-2 text-sm text-ink-300">${escapeHtml(item.reviewNotes)}</p>`
-                              : ''
-                          }
+      void Promise.all([listAcademyIntake(), listMyAcademyApplications()])
+        .then(([intake, items]) => {
+          const intakeHost = root.querySelector('#academy-intake-root');
+          const appsHost = root.querySelector('#academy-apps-root');
+          const byType = Object.fromEntries((intake ?? []).map((row) => [row.type, row]));
+
+          if (intakeHost) {
+            intakeHost.innerHTML = ['ACADEMY', 'TRANSFER']
+              .map((type) => {
+                const config = byType[type] ?? { type, isOpen: false };
+                const open = Boolean(config.isOpen);
+                const href = type === 'ACADEMY' ? '/academy/apply' : '/academy/apply/transfer';
+                return `
+                  <article class="panel relative overflow-hidden p-5">
+                    <div class="pointer-events-none absolute inset-0 ${open ? 'bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_50%)]' : 'bg-[radial-gradient(ellipse_at_top_right,_rgba(244,63,94,0.10),_transparent_50%)]'}"></div>
+                    <div class="relative">
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 class="text-lg font-semibold text-white">${TYPE_LABELS[type]}</h3>
+                          <p class="mt-1 text-sm text-ink-400">${TYPE_DESCRIPTIONS[type]}</p>
                         </div>
-                      `,
-                        )
-                        .join('')
-                    : `<p class="text-sm text-ink-400">No tienes postulaciones todavía.</p>`
-                }
-              </div>
-            </section>
-          `;
+                        <span class="rounded-full border px-3 py-1 text-xs font-semibold ${open ? 'border-emerald-400/30 bg-emerald-500/15 text-emerald-300' : 'border-rose-400/30 bg-rose-500/15 text-rose-300'}">
+                          ${open ? 'Convocatoria abierta' : 'Convocatoria cerrada'}
+                        </span>
+                      </div>
+                      <div class="mt-5">
+                        ${
+                          open
+                            ? `<a data-link href="${href}" class="btn-primary">Postular ahora</a>`
+                            : `<button type="button" class="btn-secondary cursor-not-allowed opacity-60" disabled>Postulaciones cerradas</button>`
+                        }
+                      </div>
+                    </div>
+                  </article>
+                `;
+              })
+              .join('');
+          }
+
+          if (appsHost) {
+            appsHost.innerHTML = `
+              <section class="panel p-5">
+                <h3 class="text-sm font-semibold text-white">Mis solicitudes</h3>
+                <div class="mt-4 space-y-3">
+                  ${
+                    items.length
+                      ? items
+                          .map(
+                            (item) => `
+                          <div class="rounded-xl border border-white/10 px-4 py-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                              <p class="text-sm font-medium text-white">${TYPE_LABELS[item.type] ?? item.type}</p>
+                              <span class="text-xs text-ink-400">${STATUS_LABELS[item.status] ?? item.status}</span>
+                            </div>
+                            <p class="mt-1 text-xs text-ink-500">${formatDateTimeLabel(item.createdAt)}</p>
+                            ${
+                              item.discordUsername || item.formData?.discordUsername
+                                ? `<p class="mt-1 text-xs text-ink-400">Discord: ${escapeHtml(item.discordUsername || item.formData.discordUsername)}</p>`
+                                : ''
+                            }
+                            ${
+                              item.reviewNotes
+                                ? `<p class="mt-2 text-sm text-ink-300">${escapeHtml(item.reviewNotes)}</p>`
+                                : ''
+                            }
+                          </div>
+                        `,
+                          )
+                          .join('')
+                      : `<p class="text-sm text-ink-400">No tienes postulaciones todavía.</p>`
+                  }
+                </div>
+              </section>
+            `;
+          }
         })
         .catch((error) => {
           setAuthAlert(root, {
@@ -120,6 +168,7 @@ export function academyApplyPage() {
     path: '/academy/apply',
     fields: [
       { id: 'fullName', label: 'Nombre completo', required: true },
+      { id: 'discordUsername', label: 'Usuario de Discord', required: true, hint: 'Ejemplo: grantmercer o grantmercer#0001' },
       { id: 'birthDate', label: 'Fecha de nacimiento', type: 'date', required: true },
       { id: 'phone', label: 'Teléfono', required: true },
       { id: 'email', label: 'Correo electrónico', type: 'email' },
@@ -143,6 +192,7 @@ export function academyTransferApplyPage() {
     path: '/academy/apply/transfer',
     fields: [
       { id: 'fullName', label: 'Nombre completo', required: true },
+      { id: 'discordUsername', label: 'Usuario de Discord', required: true, hint: 'Ejemplo: grantmercer o grantmercer#0001' },
       { id: 'originDepartment', label: 'Departamento de origen', required: true },
       { id: 'currentRank', label: 'Rango actual', required: true },
       { id: 'serviceTime', label: 'Tiempo de servicio', required: true },
@@ -176,7 +226,12 @@ function renderApplicationForm({ type, title, description, path, fields }) {
   const content = `
     <div class="space-y-6">
       ${renderAuthAlert({ id: 'academy-apply-alert' })}
-      <section class="panel p-5 md:p-8">
+      <div id="academy-apply-closed" class="hidden panel border-rose-400/20 bg-rose-500/5 p-5">
+        <p class="text-sm font-semibold text-rose-200">Convocatoria cerrada</p>
+        <p class="mt-2 text-sm text-ink-300">Esta convocatoria no acepta nuevas postulaciones en este momento.</p>
+        <a data-link href="/academy/applications" class="btn-secondary mt-4 inline-flex">Volver a postulaciones</a>
+      </div>
+      <section id="academy-apply-panel" class="panel p-5 md:p-8">
         <div class="flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p class="landing-eyebrow">Postulación</p>
@@ -201,7 +256,8 @@ function renderApplicationForm({ type, title, description, path, fields }) {
               return `
                 <div class="${span}">
                   <label class="form-label" for="${field.id}">${field.label}</label>
-                  <input id="${field.id}" type="${field.type ?? 'text'}" class="form-input" ${field.required ? 'required' : ''} maxlength="500" value="${escapeHtml(value)}" />
+                  <input id="${field.id}" type="${field.type ?? 'text'}" class="form-input" ${field.required ? 'required' : ''} maxlength="500" value="${escapeHtml(value)}" placeholder="${field.id === 'discordUsername' ? 'grantmercer' : ''}" />
+                  ${field.hint ? `<p class="form-hint">${escapeHtml(field.hint)}</p>` : ''}
                 </div>
               `;
             })
@@ -219,16 +275,29 @@ function renderApplicationForm({ type, title, description, path, fields }) {
     html: renderDashboardLayout(content, { title, currentPath: path }),
     afterMount(root) {
       const cleanup = initDashboardLayout(root);
+
+      void listAcademyIntake()
+        .then((intake) => {
+          const config = (intake ?? []).find((item) => item.type === type);
+          if (config && !config.isOpen) {
+            root.querySelector('#academy-apply-closed')?.classList.remove('hidden');
+            root.querySelector('#academy-apply-panel')?.classList.add('hidden');
+          }
+        })
+        .catch(() => {});
+
       root.querySelector('#academy-apply-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const formData = {};
         for (const field of fields) {
+          if (field.id === 'discordUsername') continue;
           const el = root.querySelector(`#${field.id}`);
           formData[field.id] = el?.value?.trim?.() ?? '';
         }
+        const discordUsername = root.querySelector('#discordUsername')?.value?.trim?.() ?? '';
 
         try {
-          await createAcademyApplication({ type, formData });
+          await createAcademyApplication({ type, discordUsername, formData });
           setAuthAlert(root, {
             id: 'academy-apply-alert',
             type: 'success',

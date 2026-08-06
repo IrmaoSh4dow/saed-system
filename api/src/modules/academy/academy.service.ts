@@ -33,6 +33,7 @@ import {
   UpdateAcademyAnnouncementDto,
   UpdateAcademyTrainingDto,
 } from './dto/academy.dto';
+import { ApplicationConfigurationsService } from './application-configurations.service';
 
 const characterCardSelect = {
   id: true,
@@ -91,6 +92,7 @@ export class AcademyService {
     private readonly notificationsService: NotificationsService,
     private readonly rolesService: RolesService,
     private readonly permissionsService: PermissionsService,
+    private readonly applicationConfigurationsService: ApplicationConfigurationsService,
   ) {}
 
   async getDashboard(characterId: string, permissions: string[]) {
@@ -638,7 +640,13 @@ export class AcademyService {
     dto: CreateAcademyApplicationDto,
     actor: { accountId: string; characterId: string },
   ) {
+    await this.applicationConfigurationsService.assertOpen(dto.type);
     this.validateApplicationForm(dto.type, dto.formData);
+
+    const discordUsername = dto.discordUsername.trim();
+    if (!discordUsername) {
+      throw new BadRequestException('discordUsername is required');
+    }
 
     if (await this.permissionsService.belongsToLspd(actor.characterId)) {
       throw new ForbiddenException(
@@ -671,11 +679,17 @@ export class AcademyService {
       throw new ConflictException('You already have a pending application of this type');
     }
 
+    const formData = {
+      ...dto.formData,
+      discordUsername,
+    };
+
     const application = await this.prismaService.academyApplication.create({
       data: {
         type: dto.type,
         characterId: actor.characterId,
-        formData: dto.formData as Prisma.InputJsonValue,
+        discordUsername,
+        formData: formData as Prisma.InputJsonValue,
         status: AcademyApplicationStatus.PENDING,
       },
       include: applicationInclude,
@@ -687,7 +701,7 @@ export class AcademyService {
       action: 'academy.application_created',
       targetType: AUDIT_TARGET.ACADEMY,
       targetId: application.id,
-      metadata: { type: dto.type },
+      metadata: { type: dto.type, discordUsername },
     });
 
     await this.notificationsService.create({
@@ -1356,6 +1370,7 @@ function canReviewApplications(permissions: string[]) {
     set.has('*') ||
     set.has('admin.access') ||
     set.has('academy.applications') ||
+    set.has('applications.manage') ||
     set.has('academy.manage')
   );
 }

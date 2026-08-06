@@ -171,6 +171,7 @@ const PERMISSIONS = [
   { key: 'academy.manage', description: 'Manage academy trainings and announcements' },
   { key: 'academy.apply', description: 'Submit academy or transfer applications' },
   { key: 'academy.applications', description: 'Review academy applications' },
+  { key: 'applications.manage', description: 'Open/close application convocatorias (High Command)' },
   { key: 'agreements.read', description: 'View institutional business agreements' },
   { key: 'agreements.manage', description: 'Manage institutional business agreements' },
   { key: 'establishments.read', description: 'View establishments catalog (admin)' },
@@ -307,6 +308,7 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'occupational-health.read',
   'appointments.assign',
   'academy.applications',
+  'applications.manage',
   'incentives.read',
   'incentives.manage',
   'incentives.pay',
@@ -681,10 +683,26 @@ async function seed(): Promise<void> {
     await upsertBootstrapStaffAccount(bootstrap);
   }
 
+  await ensureApplicationConfigurations();
+
   await pruneOperationalData();
   await seedTreatments();
 
   console.log('Identity + administrative seed completed');
+}
+
+async function ensureApplicationConfigurations(): Promise<void> {
+  for (const type of ['ACADEMY', 'TRANSFER'] as const) {
+    await prisma.applicationConfiguration.upsert({
+      where: { type },
+      update: {},
+      create: {
+        type,
+        isOpen: false,
+      },
+    });
+  }
+  console.log('Application configurations ensured (ACADEMY, TRANSFER)');
 }
 
 /**

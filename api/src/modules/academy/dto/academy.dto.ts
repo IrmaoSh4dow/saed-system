@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -7,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -153,8 +155,22 @@ export class CreateAcademyApplicationDto {
   @IsEnum(AcademyApplicationType)
   type!: AcademyApplicationType;
 
+  @IsString()
+  @MinLength(2)
+  @MaxLength(37)
+  @Matches(/^[a-zA-Z0-9._]{2,32}(?:#\d{4})?$/, {
+    message:
+      'discordUsername must be a Discord username (e.g. grantmercer or grantmercer#0001)',
+  })
+  discordUsername!: string;
+
   @IsObject()
   formData!: Record<string, unknown>;
+}
+
+export class SetApplicationIntakeDto {
+  @IsBoolean()
+  isOpen!: boolean;
 }
 
 export class ReviewAcademyApplicationDto {

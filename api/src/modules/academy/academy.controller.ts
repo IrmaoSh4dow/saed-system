@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -14,18 +15,21 @@ import { AcademyApplicationStatus, AcademyApplicationType } from '@prisma/client
 import { CurrentAccount } from '../../common/decorators/current-account.decorator';
 import { CurrentCharacter } from '../../common/decorators/current-character.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { RequireCharacter } from '../../common/decorators/require-character.decorator';
 import { CharacterGuard } from '../../common/guards/character.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import type { IAuthAccount, IAuthCharacter } from '../auth/interfaces/i-auth-request.interface';
 import { AcademyService } from './academy.service';
+import { ApplicationConfigurationsService } from './application-configurations.service';
 import {
   CreateAcademyAnnouncementDto,
   CreateAcademyApplicationDto,
   CreateAcademyTrainingDto,
   RespondTrainingAttendanceDto,
   ReviewAcademyApplicationDto,
+  SetApplicationIntakeDto,
   UpdateAcademyAnnouncementDto,
   UpdateAcademyTrainingDto,
 } from './dto/academy.dto';
@@ -34,7 +38,43 @@ import {
 @UseGuards(JwtAuthGuard, CharacterGuard, PermissionsGuard)
 @RequireCharacter(true)
 export class AcademyController {
-  constructor(private readonly academyService: AcademyService) {}
+  constructor(
+    private readonly academyService: AcademyService,
+    private readonly applicationConfigurationsService: ApplicationConfigurationsService,
+  ) {}
+
+  @Public()
+  @RequireCharacter(false)
+  @Get('intake')
+  listPublicIntake() {
+    return this.applicationConfigurationsService.listPublicIntake();
+  }
+
+  @Get('applications/configurations')
+  @Permissions('applications.manage')
+  listApplicationConfigurations() {
+    return this.applicationConfigurationsService.listConfigurations();
+  }
+
+  @Get('applications/stats')
+  @Permissions('applications.manage')
+  getApplicationStats() {
+    return this.applicationConfigurationsService.getDashboardStats();
+  }
+
+  @Patch('applications/configurations/:type')
+  @Permissions('applications.manage')
+  setApplicationIntake(
+    @Param('type', new ParseEnumPipe(AcademyApplicationType)) type: AcademyApplicationType,
+    @CurrentAccount() account: IAuthAccount,
+    @CurrentCharacter() character: IAuthCharacter,
+    @Body() dto: SetApplicationIntakeDto,
+  ) {
+    return this.applicationConfigurationsService.setOpenState(type, dto.isOpen, {
+      accountId: account.id,
+      characterId: character.id,
+    });
+  }
 
   @Get('staff/search')
   @Permissions('academy.manage')
@@ -161,7 +201,6 @@ export class AcademyController {
   }
 
   @Get('applications')
-  @Permissions('academy.applications')
   listApplications(
     @CurrentCharacter() character: IAuthCharacter,
     @Query('type') type?: AcademyApplicationType,
@@ -199,7 +238,6 @@ export class AcademyController {
   }
 
   @Patch('applications/:id/review')
-  @Permissions('academy.applications')
   reviewApplication(
     @CurrentAccount() account: IAuthAccount,
     @CurrentCharacter() character: IAuthCharacter,

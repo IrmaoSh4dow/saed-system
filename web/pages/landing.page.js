@@ -16,12 +16,17 @@ import {
   renderNewsSection,
 } from '../components/landing/news-section.js';
 import {
+  paintRecruitmentSection,
+  renderRecruitmentSection,
+} from '../components/landing/recruitment-section.js';
+import {
   initOfficerCarousel,
   paintOfficerCarousel,
   renderOfficerCarousel,
 } from '../components/landing/staff-carousel.js';
 import { bindAppModal } from '../components/ui/modal.js';
 import { initLandingLayout, renderLandingLayout } from '../layouts/landing.layout.js';
+import { listAcademyIntake } from '../services/academy.service.js';
 import { listActiveGallery } from '../services/gallery.service.js';
 import { listLandingPersonnel } from '../services/landing.service.js';
 import { listPublishedNews } from '../services/news.service.js';
@@ -34,6 +39,7 @@ export function landingPage() {
     renderHero(),
     renderModulesSection(),
     renderAboutSection(),
+    renderRecruitmentSection([]),
     renderNewsSection([]),
     renderOfficerCarousel([]),
     renderDepartmentsSection(),
@@ -68,10 +74,12 @@ export function landingPage() {
         listPublishedNews().catch(() => []),
         listLandingPersonnel().catch(() => []),
         listActiveGallery().catch(() => []),
-      ]).then(([news, personnel, gallery]) => {
+        listAcademyIntake().catch(() => []),
+      ]).then(([news, personnel, gallery, intake]) => {
         paintNewsSection(root, news);
         paintOfficerCarousel(root, personnel);
         paintGallerySection(root, gallery);
+        paintRecruitmentSection(root, intake);
         newsCleanup?.();
         newsCleanup = bindNewsSection(root, news);
         carouselCleanup?.();
