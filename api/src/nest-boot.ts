@@ -18,8 +18,8 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
  * Pass the same `http.Server` that accepts connections so Socket.IO shares
  * that transport (otherwise REST works but realtime chat never reaches clients).
  *
- * Database migrations and seeds are never run on boot — apply them
- * intentionally via ops scripts when schema changes are approved.
+ * On Railway, `prisma migrate deploy` + seed run in the start command
+ * before this process is launched (see api/railway.toml).
  */
 export async function attachNestToServer(
   httpServer?: HttpServer,
@@ -89,7 +89,7 @@ export async function attachNestToServer(
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   await app.init();
-  logger.log('Nest init complete (no automatic migrate/seed on boot)');
+  logger.log('Nest init complete');
 
   return expressApp as unknown as RequestHandler;
 }

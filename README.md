@@ -182,7 +182,7 @@ npx prisma studio            # UI opcional
 | `npm run start:dev` | Nest en modo watch |
 | `npm run build` | Compilación producción |
 | `npm run start:prod` | `node server.cjs` (mismo entry que Railway) |
-| `npm run start:railway` | Entry de producción Railway (`node server.cjs`) |
+| `npm run start:railway` | Railway: `migrate deploy` + seed + `server.cjs` |
 | `npm run prisma:migrate:deploy` | Aplica migraciones pendientes |
 | `npm run prisma:release` | `migrate deploy` + seed |
 | `npm run prisma:generate` | Genera Prisma Client |

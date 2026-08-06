@@ -681,10 +681,86 @@ async function seed(): Promise<void> {
     await upsertBootstrapStaffAccount(bootstrap);
   }
 
+  await pruneOperationalData();
   await removeNonBaseAccounts();
   await seedTreatments();
 
   console.log('Identity + administrative seed completed');
+}
+
+/**
+ * Wipe transactional / operational content while preserving:
+ * - @sh4dow account + characters + staff profile / assignments
+ * - catalogs: roles, permissions, ranks, departments, licenses, decorations,
+ *   treatments, establishments, incentive configuration
+ *
+ * Controlled by PRUNE_OPERATIONAL_DATA (default: true).
+ * Set PRUNE_OPERATIONAL_DATA=false on Railway after the initial cleanup deploy.
+ */
+async function pruneOperationalData(): Promise<void> {
+  const enabled = String(process.env.PRUNE_OPERATIONAL_DATA ?? 'true').toLowerCase() !== 'false';
+  if (!enabled) {
+    console.log('Skipping operational data prune (PRUNE_OPERATIONAL_DATA=false)');
+    return;
+  }
+
+  console.log('Pruning operational data (keeping catalogs + @sh4dow)…');
+
+  // Explicit list — do NOT include Account/Character/StaffProfile/catalog tables.
+  // CASCADE clears dependent FK rows that reference these tables.
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "StaffRating",
+      "IncentivePayment",
+      "StaffShift",
+      "MedicalRecordAccessRequest",
+      "PsychotechnicalEvaluation",
+      "MedicalLeave",
+      "MedicalRecord",
+      "Hospitalization",
+      "Diagnosis",
+      "Surgery",
+      "PatientInvoice",
+      "ReportParticipant",
+      "ReportEvidence",
+      "ReportTransfer",
+      "Report",
+      "Patient",
+      "ComplaintEvidence",
+      "ComplaintMessage",
+      "ComplaintInternalNote",
+      "ComplaintAssignment",
+      "ComplaintEvent",
+      "Complaint",
+      "AppointmentMessage",
+      "AppointmentInternalNote",
+      "AppointmentAssignment",
+      "AppointmentEvent",
+      "Appointment",
+      "AdminRequestMessage",
+      "AdminRequestInternalNote",
+      "AdminRequestAssignment",
+      "AdminRequestEvent",
+      "AdminRequest",
+      "AcademyTrainingAttendance",
+      "AcademyTrainingSupportStaff",
+      "AcademyTraining",
+      "AcademyAnnouncement",
+      "AcademyApplication",
+      "InterestLetter",
+      "DepartmentOpening",
+      "DepartmentSupervisor",
+      "AgreementHistory",
+      "Agreement",
+      "NewsArticle",
+      "GalleryItem",
+      "Notification",
+      "AuditLog",
+      "RefreshToken"
+    RESTART IDENTITY CASCADE
+  `);
+
+  console.log('Operational data pruned');
 }
 
 const DEFAULT_TREATMENTS = [

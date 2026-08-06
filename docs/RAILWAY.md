@@ -4,7 +4,7 @@ Monorepo con **dos servicios** independientes. Cada uno usa su propio `PORT` iny
 
 | Servicio | Root Directory | Builder | Start |
 |----------|----------------|---------|-------|
-| API | `api` | Nixpacks (`api/railway.toml`) | `node server.cjs` |
+| API | `api` | Nixpacks (`api/railway.toml`) | `npx prisma migrate deploy && npm run prisma:seed && node server.cjs` |
 | Frontend | `web` | Nixpacks (`web/railway.toml`) | `npm run start:railway` |
 
 El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no es branding legado del sistema. El producto se llama **SAED**.
@@ -15,11 +15,12 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 
 ### Build / start
 
-- Build: `npm run build` (`prisma generate` + `nest build`)
-- Start: `node server.cjs` (escucha `0.0.0.0:$PORT`, health en `/health`, luego carga Nest)
-- Healthcheck: `GET /health` (respuesta 200 aunque Nest aún esté booting)
-
-No se ejecutan migraciones ni seed al arrancar. Aplicarlas a propósito (ver más abajo).
+1. **Build:** `npm run build` (`prisma generate` + `nest build`)
+2. **Start:**
+   - `npx prisma migrate deploy` → aplica migraciones sobre `DATABASE_URL` (conserva datos)
+   - `npm run prisma:seed` → catálogos + cuenta `@sh4dow` + prune operativo (ver abajo)
+   - `node server.cjs` → escucha `0.0.0.0:$PORT`, health en `/health`
+3. **Healthcheck:** `GET /health` (timeout 300s para dar margen a migrate/seed)
 
 ### Variables (panel del servicio API)
 
@@ -27,35 +28,32 @@ No se ejecutan migraciones ni seed al arrancar. Aplicarlas a propósito (ver má
 |----------|-------------|-------|
 | `DATABASE_URL` | Sí | Plugin PostgreSQL de Railway |
 | `JWT_SECRET` | Sí | ≥ 16 caracteres |
-| `FRONTEND_URL` | Sí | Origen(es) del front, separados por coma. Ej. `https://web.up.railway.app` |
+| `FRONTEND_URL` | Sí | Origen(es) del front, separados por coma |
 | `API_PREFIX` | No | Default `api/v1` |
-| `PORT` | Inyectada | No hardcodear 8081 ni otro puerto fijo |
+| `PORT` | Inyectada | No hardcodear puerto fijo |
 | `NODE_ENV` | Recomendada | `production` |
+| `PRUNE_OPERATIONAL_DATA` | No | Default `true`. Borra informes, pacientes, citas, quejas, etc. Conserva catálogos y `@sh4dow`. **Pon `false` después del primer deploy limpio.** |
 | `DISCORD_SHIFTS_WEBHOOK_URL` | No | Webhook de turnos |
-| `PUBLIC_ASSET_BASE_URL` | No | Origen público para URLs absolutas de assets |
+| `PUBLIC_ASSET_BASE_URL` | No | Origen público para assets |
 
-### Migraciones / seed
+### Qué conserva el seed / prune
 
-Tras el primer deploy o cuando haya migraciones nuevas:
+**Se mantiene**
 
-```bash
-# En el servicio API (Railway shell / one-off)
-npx prisma migrate deploy
+- Cuenta `@sh4dow` (personajes, staff, roles, ocupaciones, licencias/condecoraciones asignadas)
+- Roles, permisos, rangos, departamentos
+- Catálogo de licencias y condecoraciones
+- Tratamientos, establishments, configuración de incentivos
 
-# Opcional: roles/permisos/rangos (cuidado en prod con datos existentes)
-npm run prisma:seed
+**Se vacía** (si `PRUNE_OPERATIONAL_DATA` ≠ `false`)
 
-# Atajo local/ops
-npm run prisma:release
-```
+- Pacientes / EMR / facturas clínicas
+- Informes médicos
+- Citas, quejas, solicitudes administrativas
+- Turnos, valoraciones, pagos de incentivos
+- Academia operativa, noticias/galería CMS, convenios, auditoría, notificaciones, refresh tokens
 
-Si solo cambian permisos RBAC sin migración:
-
-```bash
-node scripts/sync-high-command-modules-permissions.js
-node scripts/sync-lspd-permissions.js
-node scripts/sync-staff-ratings-permissions.js
-```
+Otras cuentas distintas de `@sh4dow` se eliminan en cada seed.
 
 ---
 
@@ -69,8 +67,6 @@ node scripts/sync-staff-ratings-permissions.js
 
 ### Variables (build-time)
 
-Vite embebe estas variables en el build. Configúralas **antes** de construir y **redeploy** si cambian.
-
 | Variable | Obligatoria | Ejemplo |
 |----------|-------------|---------|
 | `VITE_API_BASE_URL` | Sí | `https://<api>.up.railway.app/api/v1` |
@@ -82,12 +78,12 @@ Vite embebe estas variables en el build. Configúralas **antes** de construir y 
 
 ## Checklist post-deploy
 
-1. API `/health` → `nestReady: true`
-2. Front carga y llama a la API pública (sin CORS errors)
-3. Login local + selección de personaje
-4. Socket.IO (chat / notificaciones) sobre el mismo origen de la API
-5. Migraciones aplicadas (`prisma migrate deploy`)
-6. `FRONTEND_URL` apunta al dominio real del front (incluye custom domain si aplica)
+1. Redeploy del servicio API (para ejecutar migrate + seed)
+2. API `/health` → `nestReady: true`
+3. Login `@sh4dow` + personajes intactos
+4. Sin pacientes/informes residuales de otras cuentas
+5. Cuando el entorno ya esté limpio: `PRUNE_OPERATIONAL_DATA=false` (si no, cada redeploy vacía de nuevo la operativa)
+6. Front sin errores CORS; `FRONTEND_URL` con el dominio real
 
 ---
 
@@ -96,8 +92,6 @@ Vite embebe estas variables en el build. Configúralas **antes** de construir y 
 | Servicio | Target Port | Escucha |
 |----------|-------------|---------|
 | Frontend | `PORT` (Railway) | `process.env.PORT` |
-| API | `PORT` (Railway) | `process.env.PORT` (default local `8080` en `server.cjs` / `3000` en `.env.example`) |
+| API | `PORT` (Railway) | `process.env.PORT` |
 
 Cada servicio Railway tiene su propio `PORT`. El API **no** fuerza 8081.
-
-Opcional local: `API_PORT` solo para overrides Nest.
