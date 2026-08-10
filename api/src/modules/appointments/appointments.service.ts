@@ -16,6 +16,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { StaffRatingsService } from '../staff-ratings/staff-ratings.service';
 import {
   AssignAppointmentStaffDto,
   CreateAppointmentDto,
@@ -55,7 +56,9 @@ const appointmentInclude = {
           accountId: true,
           staffProfile: {
             select: {
+              id: true,
               employeeNumber: true,
+              status: true,
               department: { select: { id: true, name: true, slug: true, imageUrl: true } },
               rank: { select: { id: true, name: true } },
             },
@@ -80,6 +83,7 @@ export class AppointmentsService {
     private readonly permissionsService: PermissionsService,
     private readonly notificationsService: NotificationsService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly staffRatingsService: StaffRatingsService,
   ) {}
 
   async canManageAppointments(characterId: string, permissions: string[] = []) {
@@ -189,6 +193,11 @@ export class AppointmentsService {
         visibleToCitizen: !INTERNAL_EVENT_TYPES.has(event.type),
       }));
 
+    const rating = await this.staffRatingsService.getAppointmentEligibility(
+      id,
+      characterId,
+    );
+
     return {
       ...appointment,
       preferredDate: toDateOnlyString(appointment.preferredDate),
@@ -203,6 +212,7 @@ export class AppointmentsService {
       canSeeInternal,
       isRequester,
       isAssignee,
+      rating,
     };
   }
 
@@ -259,10 +269,17 @@ export class AppointmentsService {
       metadata: { from: existing.status, to: dto.status },
     });
 
+    const ratingInvite =
+      appointment.status === AppointmentStatus.COMPLETED &&
+      appointment.assignments.some((item) => item.character.staffProfile);
+
     await this.notifyParticipants(appointment, actor.characterId, {
       type: NotificationType.APPOINTMENT_STATUS,
       title: `Cita #${appointment.caseNumber}`,
-      body: `Estado actualizado: ${appointment.status}`,
+      bodyFor: (recipientCharacterId) =>
+        ratingInvite && recipientCharacterId === appointment.requesterId
+          ? 'Tu cita fue finalizada. Ya puedes valorar la atención recibida.'
+          : `Estado actualizado: ${appointment.status}`,
     });
 
     this.realtimeGateway.emitToRoom(
@@ -540,19 +557,26 @@ export class AppointmentsService {
   private async notifyParticipants(
     appointment: Prisma.AppointmentGetPayload<{ include: typeof appointmentInclude }>,
     actorCharacterId: string,
-    payload: { type: NotificationType; title: string; body: string },
+    payload: {
+      type: NotificationType;
+      title: string;
+      body?: string;
+      bodyFor?: (recipientCharacterId: string) => string;
+    },
   ) {
     const recipients = await this.collectParticipants(appointment);
     for (const recipient of recipients) {
       if (recipient.characterId === actorCharacterId) {
         continue;
       }
+      const body =
+        payload.bodyFor?.(recipient.characterId) ?? payload.body ?? '';
       await this.notificationsService.create({
         accountId: recipient.accountId,
         characterId: recipient.characterId,
         type: payload.type,
         title: payload.title,
-        body: payload.body,
+        body,
         href: `/appointments?id=${appointment.id}`,
         metadata: { appointmentId: appointment.id },
       });

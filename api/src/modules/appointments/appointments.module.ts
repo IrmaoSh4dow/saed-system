@@ -10,6 +10,7 @@ import { parseCorsOrigins } from '../../common/utils/cors-origins.util';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RealtimeModule } from '../../realtime/realtime.module';
+import { StaffRatingsModule } from '../staff-ratings/staff-ratings.module';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
 
@@ -52,7 +53,12 @@ export class AppointmentsGateway {
 }
 
 @Module({
-  imports: [PermissionsModule, NotificationsModule, RealtimeModule],
+  imports: [
+    PermissionsModule,
+    NotificationsModule,
+    RealtimeModule,
+    StaffRatingsModule,
+  ],
   controllers: [AppointmentsController],
   providers: [AppointmentsService, AppointmentsGateway],
   exports: [AppointmentsService],

@@ -1,4 +1,5 @@
 import { resolveUploadUrl } from '../../utils/media.js';
+import { formatStaffRankLabel } from '../../utils/staff-rank.js';
 import { resolveStaffDepartments } from '../../utils/staff-departments.js';
 
 const STATUS_LABELS = {
@@ -25,7 +26,7 @@ export function renderOfficerCard(officer) {
   const fullName = `${firstName} ${lastName}`.trim() || 'Personal';
   const initials = `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase() || 'MD';
   const avatarUrl = resolveUploadUrl(officer.character?.avatarUrl);
-  const rankName = officer.rank?.name ?? '—';
+  const rankName = formatStaffRankLabel(officer.rank);
   const { primaryName } = resolveStaffDepartments(officer);
   const departmentName = primaryName ?? 'Sin departamento';
   const status = officer.status ?? 'ACTIVE';

@@ -24,6 +24,13 @@ export async function getStaffRatingEligibility(adminRequestId) {
   return unwrap(response);
 }
 
+export async function getAppointmentRatingEligibility(appointmentId) {
+  const response = await apiClient.get(
+    `/staff-ratings/eligibility/appointment/${appointmentId}`,
+  );
+  return unwrap(response);
+}
+
 export async function getStaffProfileRatings(staffProfileId, params = {}) {
   const response = await apiClient.get(`/staff-ratings/staff/${staffProfileId}`, { params });
   return unwrap(response);

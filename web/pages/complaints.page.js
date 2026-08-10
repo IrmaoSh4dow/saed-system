@@ -18,7 +18,12 @@ export function complaintsPage() {
   }
 
   if (
-    !requireAnyPermission([PERMISSIONS.COMPLAINTS_ASSIGN, PERMISSIONS.COMPLAINTS_MANAGE])
+    !requireAnyPermission([
+      PERMISSIONS.COMPLAINTS_READ,
+      PERMISSIONS.COMPLAINTS_CREATE,
+      PERMISSIONS.COMPLAINTS_ASSIGN,
+      PERMISSIONS.COMPLAINTS_MANAGE,
+    ])
   ) {
     return { html: '', afterMount: () => {} };
   }

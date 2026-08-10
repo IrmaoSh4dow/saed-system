@@ -1,5 +1,6 @@
 import { icon } from '../landing/icons.js';
 import { resolveUploadUrl } from '../../utils/media.js';
+import { formatStaffRankLabel } from '../../utils/staff-rank.js';
 import { renderStaffDecorationsGrid } from './staff-decorations-grid.js';
 import { renderStaffLicensesGrid } from './staff-licenses-grid.js';
 import { renderStaffDepartmentPanel } from './staff-department-panel.js';
@@ -27,7 +28,7 @@ export function renderOfficerFiche(officer) {
   const fullName = `${firstName} ${lastName}`.trim();
   const initials = `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase();
   const avatarUrl = resolveUploadUrl(character.avatarUrl ?? officer.avatarUrl);
-  const rankName = officer.rank?.name ?? officer.rankLabel ?? '—';
+  const rankName = formatStaffRankLabel(officer.rank ?? officer.rankLabel);
   const { primary, alternates, primaryName, primaryImageUrl, primaryRole } =
     resolveStaffDepartments(officer);
   const status = officer.status ?? 'ACTIVE';

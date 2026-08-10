@@ -12,9 +12,7 @@ export function createComplaintPage() {
     return { html: '', afterMount: () => {} };
   }
 
-  if (
-    !requireAnyPermission([PERMISSIONS.COMPLAINTS_ASSIGN, PERMISSIONS.COMPLAINTS_MANAGE])
-  ) {
+  if (!requireAnyPermission([PERMISSIONS.COMPLAINTS_CREATE])) {
     return { html: '', afterMount: () => {} };
   }
 

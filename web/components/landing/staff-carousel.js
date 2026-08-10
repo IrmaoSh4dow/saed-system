@@ -52,7 +52,10 @@ export function paintOfficerCarousel(root, officers = []) {
 function renderOfficerCard(officer) {
   const name = `${officer.character?.firstName ?? ''} ${officer.character?.lastName ?? ''}`.trim();
   const image = resolveUploadUrl(officer.character?.avatarUrl);
-  const rank = officer.rank?.name ?? 'Sin rango';
+  const rank =
+    officer.rank?.slug === 'administrator' || officer.rank?.name === 'Administrador'
+      ? 'Directiva'
+      : (officer.rank?.name ?? 'Sin rango');
   const department =
     officer.departmentMemberships?.find((row) => row.isPrimary)?.department?.name ??
     officer.department?.name ??

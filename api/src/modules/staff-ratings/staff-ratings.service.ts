@@ -8,8 +8,10 @@ import {
 import {
   AdminRequestStatus,
   AdminRequestType,
+  AppointmentStatus,
   NotificationType,
   Prisma,
+  StaffStatus,
 } from '@prisma/client';
 import { hasAnyPermission } from '../../common/utils/permission.util';
 import { PrismaService } from '../../database/prisma.service';
@@ -22,6 +24,12 @@ const HIGH_COMMAND_READ_PERMISSIONS = [
   'staff-ratings.dashboard',
   '*',
 ] as const;
+
+type StaffProfileSnippet = {
+  id: string;
+  employeeNumber: string;
+  character: { firstName: string; lastName: string; id?: string; accountId?: string };
+};
 
 @Injectable()
 export class StaffRatingsService {
@@ -44,10 +52,24 @@ export class StaffRatingsService {
       throw new BadRequestException('score must be an integer between 1 and 5');
     }
 
+    if (Boolean(dto.adminRequestId) === Boolean(dto.appointmentId)) {
+      throw new BadRequestException(
+        'Provide exactly one of adminRequestId or appointmentId',
+      );
+    }
+
+    if (dto.adminRequestId) {
+      return this.createForAdminRequest(dto.adminRequestId, score, dto.comment, actor);
+    }
+
+    return this.createForAppointment(dto.appointmentId!, score, dto.comment, actor);
+  }
+
+  async getEligibility(adminRequestId: string, actorCharacterId: string) {
     const request = await this.prismaService.adminRequest.findUnique({
-      where: { id: dto.adminRequestId },
+      where: { id: adminRequestId },
       include: {
-        staffRating: { select: { id: true } },
+        staffRating: { include: this.ratingInclude() },
         assignee: {
           select: {
             id: true,
@@ -65,123 +87,23 @@ export class StaffRatingsService {
             },
           },
         },
-      },
-    });
-
-    if (!request) {
-      throw new NotFoundException('Administrative request was not found');
-    }
-
-    if (request.requesterId !== actor.characterId) {
-      throw new ForbiddenException(
-        'Only the citizen who requested the appointment can leave a rating',
-      );
-    }
-
-    if (request.type !== AdminRequestType.ADMINISTRATIVE_APPOINTMENT) {
-      throw new BadRequestException(
-        'Ratings are only available for administrative appointments',
-      );
-    }
-
-    if (request.status !== AdminRequestStatus.COMPLETED) {
-      throw new BadRequestException(
-        'Ratings can only be submitted after the appointment is completed',
-      );
-    }
-
-    if (request.staffRating) {
-      throw new ConflictException(
-        'This appointment already has a rating',
-      );
-    }
-
-    const staffProfile = request.assignee?.staffProfile;
-    if (!staffProfile) {
-      throw new BadRequestException(
-        'No medical staff profile is linked to the appointment assignee',
-      );
-    }
-
-    const comment = dto.comment?.trim() || null;
-
-    try {
-      const created = await this.prismaService.staffRating.create({
-        data: {
-          staffProfileId: staffProfile.id,
-          reviewerCharacterId: actor.characterId,
-          adminRequestId: request.id,
-          score,
-          comment,
-        },
-        include: this.ratingInclude(),
-      });
-
-      await this.auditService.create({
-        actorAccountId: actor.accountId,
-        actorCharacterId: actor.characterId,
-        action: 'staff-ratings.created',
-        targetType: AUDIT_TARGET.STAFF_RATING,
-        targetId: created.id,
-        metadata: {
-          staffProfileId: staffProfile.id,
-          adminRequestId: request.id,
-          score,
-          hasComment: Boolean(comment),
-        },
-      });
-
-      if (request.assignee?.accountId) {
-        await this.notificationsService.create({
-          accountId: request.assignee.accountId,
-          characterId: request.assignee.id,
-          type: NotificationType.STAFF_RATING_CREATED,
-          title: 'Nueva valoración recibida',
-          body: `Has recibido una valoración de ${score}★ por la cita administrativa #${request.requestNumber}.`,
-          href: `/staff-ratings`,
-          metadata: {
-            staffRatingId: created.id,
-            adminRequestId: request.id,
-            score,
-          },
-        }).catch(() => undefined);
-      }
-
-      return this.toDto(created);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          'This appointment already has a rating',
-        );
-      }
-      throw error;
-    }
-  }
-
-  async getEligibility(
-    adminRequestId: string,
-    actorCharacterId: string,
-  ) {
-    const request = await this.prismaService.adminRequest.findUnique({
-      where: { id: adminRequestId },
-      include: {
-        staffRating: {
-          include: this.ratingInclude(),
-        },
-        assignee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            staffProfile: {
+        assignments: {
+          where: { unassignedAt: null },
+          include: {
+            character: {
               select: {
                 id: true,
-                employeeNumber: true,
-                character: {
-                  select: { id: true, firstName: true, lastName: true },
+                firstName: true,
+                lastName: true,
+                accountId: true,
+                staffProfile: {
+                  select: {
+                    id: true,
+                    employeeNumber: true,
+                    character: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
                 },
               },
             },
@@ -194,7 +116,7 @@ export class StaffRatingsService {
       return null;
     }
 
-    const staffProfile = request.assignee?.staffProfile ?? null;
+    const staffProfile = this.resolveAdminRequestStaff(request);
     const existing = request.staffRating ? this.toDto(request.staffRating) : null;
     const canRate =
       request.requesterId === actorCharacterId &&
@@ -206,7 +128,73 @@ export class StaffRatingsService {
     return {
       canRate,
       reason: !canRate
-        ? this.explainIneligibility(request, actorCharacterId, staffProfile)
+        ? this.explainAdminRequestIneligibility(request, actorCharacterId, staffProfile)
+        : null,
+      existing,
+      evaluatedStaff: staffProfile
+        ? {
+            id: staffProfile.id,
+            employeeNumber: staffProfile.employeeNumber,
+            fullName: `${staffProfile.character.firstName} ${staffProfile.character.lastName}`,
+          }
+        : null,
+    };
+  }
+
+  async getAppointmentEligibility(appointmentId: string, actorCharacterId: string) {
+    const appointment = await this.prismaService.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        staffRating: { include: this.ratingInclude() },
+        assignments: {
+          where: { unassignedAt: null },
+          orderBy: [{ isPrimary: 'desc' }, { assignedAt: 'asc' }],
+          include: {
+            character: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                accountId: true,
+                staffProfile: {
+                  select: {
+                    id: true,
+                    employeeNumber: true,
+                    status: true,
+                    character: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!appointment) {
+      return null;
+    }
+
+    const staffProfile = this.resolveAppointmentStaff(appointment.assignments);
+    const existing = appointment.staffRating
+      ? this.toDto(appointment.staffRating)
+      : null;
+    const canRate =
+      appointment.requesterId === actorCharacterId &&
+      appointment.status === AppointmentStatus.COMPLETED &&
+      !appointment.staffRating &&
+      Boolean(staffProfile);
+
+    return {
+      canRate,
+      reason: !canRate
+        ? this.explainAppointmentIneligibility(
+            appointment,
+            actorCharacterId,
+            staffProfile,
+          )
         : null,
       existing,
       evaluatedStaff: staffProfile
@@ -294,7 +282,8 @@ export class StaffRatingsService {
       monthCount,
       topRated,
       mostRated,
-      pendingCount,
+      pendingAdminCount,
+      pendingAppointmentCount,
       recent,
     ] = await Promise.all([
       this.prismaService.staffRating.aggregate({
@@ -324,7 +313,29 @@ export class StaffRatingsService {
           type: AdminRequestType.ADMINISTRATIVE_APPOINTMENT,
           status: AdminRequestStatus.COMPLETED,
           staffRating: { is: null },
-          assignee: { staffProfile: { isNot: null } },
+          OR: [
+            { assignee: { staffProfile: { isNot: null } } },
+            {
+              assignments: {
+                some: {
+                  unassignedAt: null,
+                  character: { staffProfile: { isNot: null } },
+                },
+              },
+            },
+          ],
+        },
+      }),
+      this.prismaService.appointment.count({
+        where: {
+          status: AppointmentStatus.COMPLETED,
+          staffRating: { is: null },
+          assignments: {
+            some: {
+              unassignedAt: null,
+              character: { staffProfile: { isNot: null } },
+            },
+          },
         },
       }),
       this.prismaService.staffRating.findMany({
@@ -367,7 +378,7 @@ export class StaffRatingsService {
       hospitalAverage: roundOne(aggregate._avg.score),
       totalRatings: aggregate._count._all,
       ratingsThisMonth: monthCount,
-      pendingRatings: pendingCount,
+      pendingRatings: pendingAdminCount + pendingAppointmentCount,
       topRated: topRated.map((item) => ({
         staff: staffMap.get(item.staffProfileId) ?? null,
         averageScore: roundOne(item._avg.score),
@@ -383,49 +394,451 @@ export class StaffRatingsService {
   }
 
   async listMinePending(actorCharacterId: string) {
-    const rows = await this.prismaService.adminRequest.findMany({
-      where: {
-        requesterId: actorCharacterId,
-        type: AdminRequestType.ADMINISTRATIVE_APPOINTMENT,
-        status: AdminRequestStatus.COMPLETED,
-        staffRating: { is: null },
-        assignee: { staffProfile: { isNot: null } },
-      },
+    const [adminRows, appointmentRows] = await Promise.all([
+      this.prismaService.adminRequest.findMany({
+        where: {
+          requesterId: actorCharacterId,
+          type: AdminRequestType.ADMINISTRATIVE_APPOINTMENT,
+          status: AdminRequestStatus.COMPLETED,
+          staffRating: { is: null },
+          OR: [
+            { assignee: { staffProfile: { isNot: null } } },
+            {
+              assignments: {
+                some: {
+                  unassignedAt: null,
+                  character: { staffProfile: { isNot: null } },
+                },
+              },
+            },
+          ],
+        },
+        include: {
+          assignee: {
+            select: {
+              staffProfile: {
+                select: {
+                  id: true,
+                  employeeNumber: true,
+                  character: { select: { firstName: true, lastName: true } },
+                },
+              },
+            },
+          },
+          assignments: {
+            where: { unassignedAt: null },
+            include: {
+              character: {
+                select: {
+                  staffProfile: {
+                    select: {
+                      id: true,
+                      employeeNumber: true,
+                      character: { select: { firstName: true, lastName: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 50,
+      }),
+      this.prismaService.appointment.findMany({
+        where: {
+          requesterId: actorCharacterId,
+          status: AppointmentStatus.COMPLETED,
+          staffRating: { is: null },
+          assignments: {
+            some: {
+              unassignedAt: null,
+              character: { staffProfile: { isNot: null } },
+            },
+          },
+        },
+        include: {
+          assignments: {
+            where: { unassignedAt: null },
+            orderBy: [{ isPrimary: 'desc' }, { assignedAt: 'asc' }],
+            include: {
+              character: {
+                select: {
+                  staffProfile: {
+                    select: {
+                      id: true,
+                      employeeNumber: true,
+                      status: true,
+                      character: { select: { firstName: true, lastName: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    const adminPending = adminRows.map((row) => {
+      const staff = this.resolveAdminRequestStaff(row);
+      return {
+        source: 'admin-request' as const,
+        adminRequestId: row.id,
+        appointmentId: null,
+        requestNumber: row.requestNumber,
+        subject: row.subject,
+        completedAt: row.updatedAt.toISOString(),
+        href: `/admin-requests?id=${row.id}`,
+        evaluatedStaff: staff
+          ? {
+              id: staff.id,
+              employeeNumber: staff.employeeNumber,
+              fullName: `${staff.character.firstName} ${staff.character.lastName}`,
+            }
+          : null,
+      };
+    });
+
+    const appointmentPending = appointmentRows.map((row) => {
+      const staff = this.resolveAppointmentStaff(row.assignments);
+      return {
+        source: 'appointment' as const,
+        adminRequestId: null,
+        appointmentId: row.id,
+        requestNumber: row.caseNumber,
+        subject: row.title,
+        completedAt: row.updatedAt.toISOString(),
+        href: `/appointments?id=${row.id}`,
+        evaluatedStaff: staff
+          ? {
+              id: staff.id,
+              employeeNumber: staff.employeeNumber,
+              fullName: `${staff.character.firstName} ${staff.character.lastName}`,
+            }
+          : null,
+      };
+    });
+
+    return [...adminPending, ...appointmentPending].sort(
+      (a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt),
+    );
+  }
+
+  private async createForAdminRequest(
+    adminRequestId: string,
+    score: number,
+    commentRaw: string | undefined,
+    actor: { accountId: string; characterId: string },
+  ) {
+    const request = await this.prismaService.adminRequest.findUnique({
+      where: { id: adminRequestId },
       include: {
+        staffRating: { select: { id: true } },
         assignee: {
           select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            accountId: true,
             staffProfile: {
               select: {
                 id: true,
                 employeeNumber: true,
                 character: {
-                  select: { firstName: true, lastName: true },
+                  select: { id: true, firstName: true, lastName: true },
+                },
+              },
+            },
+          },
+        },
+        assignments: {
+          where: { unassignedAt: null },
+          include: {
+            character: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                accountId: true,
+                staffProfile: {
+                  select: {
+                    id: true,
+                    employeeNumber: true,
+                    character: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
                 },
               },
             },
           },
         },
       },
-      orderBy: { updatedAt: 'desc' },
-      take: 50,
     });
 
-    return rows.map((row) => ({
-      adminRequestId: row.id,
-      requestNumber: row.requestNumber,
-      subject: row.subject,
-      completedAt: row.updatedAt.toISOString(),
-      evaluatedStaff: row.assignee?.staffProfile
+    if (!request) {
+      throw new NotFoundException('Administrative request was not found');
+    }
+
+    if (request.requesterId !== actor.characterId) {
+      throw new ForbiddenException(
+        'Only the citizen who requested the appointment can leave a rating',
+      );
+    }
+
+    if (request.type !== AdminRequestType.ADMINISTRATIVE_APPOINTMENT) {
+      throw new BadRequestException(
+        'Ratings are only available for administrative appointments',
+      );
+    }
+
+    if (request.status !== AdminRequestStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Ratings can only be submitted after the appointment is completed',
+      );
+    }
+
+    if (request.staffRating) {
+      throw new ConflictException('This appointment already has a rating');
+    }
+
+    const staffProfile = this.resolveAdminRequestStaff(request);
+    if (!staffProfile) {
+      throw new BadRequestException(
+        'No medical staff profile is linked to the appointment assignee',
+      );
+    }
+
+    const notifyCharacter =
+      request.assignee?.staffProfile?.id === staffProfile.id
+        ? request.assignee
+        : request.assignments.find(
+            (item) => item.character.staffProfile?.id === staffProfile.id,
+          )?.character;
+
+    return this.persistRating({
+      staffProfileId: staffProfile.id,
+      reviewerCharacterId: actor.characterId,
+      adminRequestId: request.id,
+      appointmentId: null,
+      score,
+      comment: commentRaw?.trim() || null,
+      actor,
+      notify: notifyCharacter
         ? {
-            id: row.assignee.staffProfile.id,
-            employeeNumber: row.assignee.staffProfile.employeeNumber,
-            fullName: `${row.assignee.staffProfile.character.firstName} ${row.assignee.staffProfile.character.lastName}`,
+            accountId: notifyCharacter.accountId,
+            characterId: notifyCharacter.id,
+            label: `cita administrativa #${request.requestNumber}`,
+            href: '/staff-ratings',
+            metadata: { adminRequestId: request.id },
           }
         : null,
-    }));
+    });
   }
 
-  private explainIneligibility(
+  private async createForAppointment(
+    appointmentId: string,
+    score: number,
+    commentRaw: string | undefined,
+    actor: { accountId: string; characterId: string },
+  ) {
+    const appointment = await this.prismaService.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        staffRating: { select: { id: true } },
+        assignments: {
+          where: { unassignedAt: null },
+          orderBy: [{ isPrimary: 'desc' }, { assignedAt: 'asc' }],
+          include: {
+            character: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                accountId: true,
+                staffProfile: {
+                  select: {
+                    id: true,
+                    employeeNumber: true,
+                    status: true,
+                    character: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment was not found');
+    }
+
+    if (appointment.requesterId !== actor.characterId) {
+      throw new ForbiddenException(
+        'Only the citizen who requested the appointment can leave a rating',
+      );
+    }
+
+    if (appointment.status !== AppointmentStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Ratings can only be submitted after the appointment is completed',
+      );
+    }
+
+    if (appointment.staffRating) {
+      throw new ConflictException('This appointment already has a rating');
+    }
+
+    const staffProfile = this.resolveAppointmentStaff(appointment.assignments);
+    if (!staffProfile) {
+      throw new BadRequestException(
+        'No medical staff profile is linked to the appointment assignee',
+      );
+    }
+
+    const notifyCharacter = appointment.assignments.find(
+      (item) => item.character.staffProfile?.id === staffProfile.id,
+    )?.character;
+
+    return this.persistRating({
+      staffProfileId: staffProfile.id,
+      reviewerCharacterId: actor.characterId,
+      adminRequestId: null,
+      appointmentId: appointment.id,
+      score,
+      comment: commentRaw?.trim() || null,
+      actor,
+      notify: notifyCharacter
+        ? {
+            accountId: notifyCharacter.accountId,
+            characterId: notifyCharacter.id,
+            label: `cita #${appointment.caseNumber}`,
+            href: '/staff-ratings',
+            metadata: { appointmentId: appointment.id },
+          }
+        : null,
+    });
+  }
+
+  private async persistRating(input: {
+    staffProfileId: string;
+    reviewerCharacterId: string;
+    adminRequestId: string | null;
+    appointmentId: string | null;
+    score: number;
+    comment: string | null;
+    actor: { accountId: string; characterId: string };
+    notify: {
+      accountId: string;
+      characterId: string;
+      label: string;
+      href: string;
+      metadata: Record<string, string>;
+    } | null;
+  }) {
+    try {
+      const created = await this.prismaService.staffRating.create({
+        data: {
+          staffProfileId: input.staffProfileId,
+          reviewerCharacterId: input.reviewerCharacterId,
+          adminRequestId: input.adminRequestId ?? undefined,
+          appointmentId: input.appointmentId ?? undefined,
+          score: input.score,
+          comment: input.comment,
+        },
+        include: this.ratingInclude(),
+      });
+
+      await this.auditService.create({
+        actorAccountId: input.actor.accountId,
+        actorCharacterId: input.actor.characterId,
+        action: 'staff-ratings.created',
+        targetType: AUDIT_TARGET.STAFF_RATING,
+        targetId: created.id,
+        metadata: {
+          staffProfileId: input.staffProfileId,
+          adminRequestId: input.adminRequestId,
+          appointmentId: input.appointmentId,
+          score: input.score,
+          hasComment: Boolean(input.comment),
+        },
+      });
+
+      if (input.notify) {
+        await this.notificationsService
+          .create({
+            accountId: input.notify.accountId,
+            characterId: input.notify.characterId,
+            type: NotificationType.STAFF_RATING_CREATED,
+            title: 'Nueva valoración recibida',
+            body: `Has recibido una valoración de ${input.score}★ por la ${input.notify.label}.`,
+            href: input.notify.href,
+            metadata: {
+              staffRatingId: created.id,
+              score: input.score,
+              ...input.notify.metadata,
+            },
+          })
+          .catch(() => undefined);
+      }
+
+      return this.toDto(created);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('This appointment already has a rating');
+      }
+      throw error;
+    }
+  }
+
+  private resolveAdminRequestStaff(request: {
+    assignee: {
+      staffProfile: StaffProfileSnippet | null;
+    } | null;
+    assignments: Array<{
+      character: { staffProfile: StaffProfileSnippet | null };
+    }>;
+  }): StaffProfileSnippet | null {
+    if (request.assignee?.staffProfile) {
+      return request.assignee.staffProfile;
+    }
+    for (const assignment of request.assignments) {
+      if (assignment.character.staffProfile) {
+        return assignment.character.staffProfile;
+      }
+    }
+    return null;
+  }
+
+  private resolveAppointmentStaff(
+    assignments: Array<{
+      isPrimary?: boolean;
+      character: {
+        staffProfile: (StaffProfileSnippet & { status?: StaffStatus }) | null;
+      };
+    }>,
+  ): StaffProfileSnippet | null {
+    const withStaff = assignments.filter(
+      (item) =>
+        item.character.staffProfile &&
+        item.character.staffProfile.status !== StaffStatus.INACTIVE &&
+        item.character.staffProfile.status !== StaffStatus.RETIRED,
+    );
+    const primary = withStaff.find((item) => item.isPrimary);
+    return (primary ?? withStaff[0])?.character.staffProfile ?? null;
+  }
+
+  private explainAdminRequestIneligibility(
     request: {
       requesterId: string;
       type: AdminRequestType;
@@ -445,6 +858,30 @@ export class StaffRatingsService {
       return 'The appointment must be completed before rating';
     }
     if (request.staffRating) {
+      return 'A rating already exists for this appointment';
+    }
+    if (!staffProfile) {
+      return 'No medical staff assignee is available to rate';
+    }
+    return 'Rating is not available';
+  }
+
+  private explainAppointmentIneligibility(
+    appointment: {
+      requesterId: string;
+      status: AppointmentStatus;
+      staffRating: { id: string } | null;
+    },
+    actorCharacterId: string,
+    staffProfile: unknown,
+  ) {
+    if (appointment.requesterId !== actorCharacterId) {
+      return 'Only the appointment requester can rate this visit';
+    }
+    if (appointment.status !== AppointmentStatus.COMPLETED) {
+      return 'The appointment must be completed before rating';
+    }
+    if (appointment.staffRating) {
       return 'A rating already exists for this appointment';
     }
     if (!staffProfile) {
@@ -476,11 +913,22 @@ export class StaffRatingsService {
           status: true,
         },
       },
+      appointment: {
+        select: {
+          id: true,
+          caseNumber: true,
+          title: true,
+          type: true,
+          status: true,
+        },
+      },
     } satisfies Prisma.StaffRatingInclude;
   }
 
   private toDto(
-    row: Prisma.StaffRatingGetPayload<{ include: ReturnType<StaffRatingsService['ratingInclude']> }>,
+    row: Prisma.StaffRatingGetPayload<{
+      include: ReturnType<StaffRatingsService['ratingInclude']>;
+    }>,
   ) {
     return {
       id: row.id,
@@ -500,13 +948,24 @@ export class StaffRatingsService {
         fullName: `${row.reviewerCharacter.firstName} ${row.reviewerCharacter.lastName}`,
         avatarUrl: row.reviewerCharacter.avatarUrl,
       },
-      adminRequest: {
-        id: row.adminRequest.id,
-        requestNumber: row.adminRequest.requestNumber,
-        subject: row.adminRequest.subject,
-        type: row.adminRequest.type,
-        status: row.adminRequest.status,
-      },
+      adminRequest: row.adminRequest
+        ? {
+            id: row.adminRequest.id,
+            requestNumber: row.adminRequest.requestNumber,
+            subject: row.adminRequest.subject,
+            type: row.adminRequest.type,
+            status: row.adminRequest.status,
+          }
+        : null,
+      appointment: row.appointment
+        ? {
+            id: row.appointment.id,
+            caseNumber: row.appointment.caseNumber,
+            title: row.appointment.title,
+            type: row.appointment.type,
+            status: row.appointment.status,
+          }
+        : null,
     };
   }
 }

@@ -88,9 +88,14 @@ export const SIDEBAR_NAVIGATION = [
   {
     name: 'Quejas',
     path: '/complaints',
-    // Deputy Medical Director and above only
-    permission: PERMISSIONS.COMPLAINTS_ASSIGN,
-    anyPermissions: [PERMISSIONS.COMPLAINTS_ASSIGN, PERMISSIONS.COMPLAINTS_MANAGE],
+    // All characters: view/create own complaints. Manage/assign remain RBAC-gated in the page.
+    permission: PERMISSIONS.COMPLAINTS_READ,
+    anyPermissions: [
+      PERMISSIONS.COMPLAINTS_READ,
+      PERMISSIONS.COMPLAINTS_CREATE,
+      PERMISSIONS.COMPLAINTS_ASSIGN,
+      PERMISSIONS.COMPLAINTS_MANAGE,
+    ],
     icon: 'alert',
   },
   {

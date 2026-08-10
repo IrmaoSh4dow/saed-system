@@ -3,6 +3,7 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_TYPE_LABELS,
 } from '../components/appointments/appointment-card.js';
+import { bindStarRating, renderStarRating } from '../components/ratings/star-rating.js';
 import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard.layout.js';
 import { getAuthState } from '../services/auth-context.js';
 import { getApiErrorMessage } from '../services/auth.service.js';
@@ -16,6 +17,7 @@ import {
   transferAppointmentDepartment,
   updateAppointmentStatus,
 } from '../services/appointments.service.js';
+import { createStaffRating } from '../services/staff-ratings.service.js';
 import { subscribeCaseRoom } from '../services/room-subscription.js';
 import { formatDateLabel, formatDateTimeLabel } from '../utils/date.js';
 import { requireActiveCharacter } from '../utils/auth-guard.js';
@@ -148,6 +150,7 @@ function renderDetail(root, appointment, activeCharacter) {
       </article>
 
       <aside class="complaint-side-panel space-y-5 xl:col-span-5 xl:sticky xl:top-6 xl:max-h-[min(70vh,40rem)] xl:overflow-y-auto xl:pr-1">
+        ${renderRatingPanel(appointment)}
         <article class="panel p-5">
           <h3 class="text-sm font-semibold text-white">Historial</h3>
           <ul class="mt-4 max-h-44 space-y-2 overflow-y-auto">
@@ -252,6 +255,50 @@ function renderDetail(root, appointment, activeCharacter) {
   if (canManage) {
     void populateDepartments(root);
   }
+  bindStarRating(root, 'appointment-rating-score');
+}
+
+function renderRatingPanel(appointment) {
+  const rating = appointment.rating;
+  if (!rating) {
+    return '';
+  }
+
+  if (rating.canRate) {
+    return `
+      <article class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-5">
+        <h3 class="text-sm font-semibold text-white">Valorar atención</h3>
+        <p class="mt-1 text-xs text-ink-300">
+          Tu cita fue finalizada.
+          ${rating.evaluatedStaff ? ` Evalúa a ${escapeHtml(rating.evaluatedStaff.fullName)}.` : ''}
+        </p>
+        <form id="appointment-rating-form" class="mt-4 space-y-3">
+          ${renderStarRating({ id: 'appointment-rating-score', value: 0, interactive: true, size: 'lg', label: 'Calificación' })}
+          <div>
+            <label class="form-label" for="appointment-rating-comment">Comentario (opcional)</label>
+            <textarea id="appointment-rating-comment" class="form-input min-h-[84px]" maxlength="2000" placeholder="Cuéntanos cómo fue la atención…"></textarea>
+          </div>
+          <button type="submit" class="btn-primary w-full">Enviar valoración</button>
+        </form>
+      </article>
+    `;
+  }
+
+  if (rating.existing) {
+    return `
+      <article class="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-5">
+        <h3 class="text-sm font-semibold text-white">Valoración enviada</h3>
+        <div class="mt-3">${renderStarRating({ value: rating.existing.score, interactive: false, label: '' })}</div>
+        ${
+          rating.existing.comment
+            ? `<p class="mt-3 text-sm text-ink-200">${escapeHtml(rating.existing.comment)}</p>`
+            : ''
+        }
+      </article>
+    `;
+  }
+
+  return '';
 }
 
 function renderAssigneeCard(assignee) {
@@ -305,6 +352,38 @@ async function populateDepartments(root) {
 
 function bindActions(root, appointment, activeCharacter, reload) {
   let searchTimer = null;
+
+  root.querySelector('#appointment-rating-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const score = Number(root.querySelector('#appointment-rating-score')?.value || 0);
+    if (!score) {
+      setAuthAlert(root, {
+        id: 'appointment-detail-alert',
+        type: 'error',
+        message: 'Selecciona una calificación de 1 a 5 estrellas.',
+      });
+      return;
+    }
+    try {
+      await createStaffRating({
+        appointmentId: appointment.id,
+        score,
+        comment: root.querySelector('#appointment-rating-comment')?.value?.trim() || undefined,
+      });
+      setAuthAlert(root, {
+        id: 'appointment-detail-alert',
+        type: 'success',
+        message: 'Valoración registrada. Gracias por tu feedback.',
+      });
+      await reload();
+    } catch (error) {
+      setAuthAlert(root, {
+        id: 'appointment-detail-alert',
+        type: 'error',
+        message: getApiErrorMessage(error),
+      });
+    }
+  });
 
   root.querySelector('#appointment-message-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();

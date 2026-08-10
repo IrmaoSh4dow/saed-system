@@ -13,7 +13,6 @@ import {
   StaffStatus,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { excludeSystemAdministrator } from '../../common/constants/staff-filters';
 import { MediaStorageService } from '../../common/storage/media-storage.service';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
@@ -101,7 +100,6 @@ export class DepartmentsService {
         memberships: {
           where: {
             isActive: true,
-            staffProfile: excludeSystemAdministrator,
           },
           include: {
             staffProfile: {
@@ -122,7 +120,6 @@ export class DepartmentsService {
           orderBy: [{ isPrimary: 'desc' }, { assignedAt: 'asc' }],
         },
         staffProfiles: {
-          where: excludeSystemAdministrator,
           include: {
             character: {
               select: {

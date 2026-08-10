@@ -8,11 +8,17 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateStaffRatingDto {
+  @ValidateIf((dto: CreateStaffRatingDto) => !dto.appointmentId)
   @IsUUID()
-  adminRequestId!: string;
+  adminRequestId?: string;
+
+  @ValidateIf((dto: CreateStaffRatingDto) => !dto.adminRequestId)
+  @IsUUID()
+  appointmentId?: string;
 
   @Type(() => Number)
   @IsInt()

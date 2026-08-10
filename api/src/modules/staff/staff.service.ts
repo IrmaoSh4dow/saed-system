@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SAED_ORGANIZATION } from '../../common/constants/workplaces';
-import { excludeSystemAdministrator } from '../../common/constants/staff-filters';
 import { hasAnyPermission } from '../../common/utils/permission.util';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
@@ -87,7 +86,6 @@ export class StaffService {
 
   findAll() {
     return this.prismaService.staffProfile.findMany({
-      where: excludeSystemAdministrator,
       include: officerInclude,
       orderBy: { employeeNumber: 'asc' },
     });
@@ -95,19 +93,20 @@ export class StaffService {
 
   /**
    * Public landing roster: active SAED members only (no PII beyond display fields).
+   * Includes Directiva (system administrator rank) as part of the institutional roster.
    */
   listPublicPersonnel(limit = 24) {
     return this.prismaService.staffProfile.findMany({
       where: {
-        AND: [
-          excludeSystemAdministrator,
-          {
-            status: StaffStatus.ACTIVE,
-            character: {
-              status: { in: [CharacterStatus.MEDICAL_STAFF, CharacterStatus.INTERN] },
-            },
+        status: StaffStatus.ACTIVE,
+        character: {
+          status: {
+            in: [
+              CharacterStatus.MEDICAL_STAFF,
+              CharacterStatus.INTERN,
+            ],
           },
-        ],
+        },
       },
       take: Math.min(Math.max(limit, 1), 60),
       orderBy: [
@@ -164,24 +163,13 @@ export class StaffService {
   }
 
   /**
-   * Operational directory lookup: system Administrator profiles are hidden
-   * unless the viewer is that character or has system role/account management.
+   * Operational directory lookup — Directiva profiles are part of the roster.
    */
   async findOperationalById(
     id: string,
-    viewer: { characterId?: string | null; permissions?: string[] },
+    _viewer: { characterId?: string | null; permissions?: string[] },
   ) {
-    const officer = await this.findById(id);
-    if (await this.isSystemAdministratorProfile(officer.characterId)) {
-      const isSelf = viewer.characterId === officer.characterId;
-      const canManageSystem = hasAnyPermission(viewer.permissions ?? [], [
-        ...SYSTEM_ROLE_ASSIGN_PERMISSIONS,
-      ]);
-      if (!isSelf && !canManageSystem) {
-        throw new NotFoundException('Officer profile was not found');
-      }
-    }
-    return officer;
+    return this.findById(id);
   }
 
   private async isSystemAdministratorProfile(characterId: string): Promise<boolean> {

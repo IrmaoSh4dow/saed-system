@@ -65,7 +65,7 @@ export function staffRatingsPage() {
           <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-300">Calidad asistencial</p>
           <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white">Valoraciones</h1>
           <p class="mt-3 max-w-2xl text-sm text-ink-300">
-            Historial confidencial de la calidad percibida por ciudadanos tras citas administrativas finalizadas.
+            Historial confidencial de la calidad percibida por ciudadanos tras citas médicas y administrativas finalizadas.
             Visible únicamente para Altos Mandos.
           </p>
         </div>

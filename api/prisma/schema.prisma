@@ -735,22 +735,25 @@ model StaffProfile {
   @@index([status])
 }
 
-/// Citizen feedback on medical staff after a completed administrative appointment.
+/// Citizen feedback on medical staff after a completed appointment (medical or administrative).
+/// Exactly one of adminRequestId / appointmentId must be set.
 /// Never deleted — ratings are immutable audit history belonging to the professional.
 model StaffRating {
-  id                  String       @id @default(uuid())
-  ratingNumber        Int          @unique @default(autoincrement())
+  id                  String        @id @default(uuid())
+  ratingNumber        Int           @unique @default(autoincrement())
   staffProfileId      String
-  staffProfile        StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Restrict)
+  staffProfile        StaffProfile  @relation(fields: [staffProfileId], references: [id], onDelete: Restrict)
   reviewerCharacterId String
-  reviewerCharacter   Character    @relation("StaffRatingReviewer", fields: [reviewerCharacterId], references: [id], onDelete: Restrict)
-  adminRequestId      String       @unique
-  adminRequest        AdminRequest @relation(fields: [adminRequestId], references: [id], onDelete: Restrict)
+  reviewerCharacter   Character     @relation("StaffRatingReviewer", fields: [reviewerCharacterId], references: [id], onDelete: Restrict)
+  adminRequestId      String?       @unique
+  adminRequest        AdminRequest? @relation(fields: [adminRequestId], references: [id], onDelete: Restrict)
+  appointmentId       String?       @unique
+  appointment         Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
   /// Star score from 1 to 5.
   score               Int
   comment             String?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   @@index([staffProfileId, createdAt])
   @@index([reviewerCharacterId])
@@ -1301,6 +1304,7 @@ model Appointment {
   internalNotes  AppointmentInternalNote[]
   assignments    AppointmentAssignment[]
   events         AppointmentEvent[]
+  staffRating    StaffRating?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 

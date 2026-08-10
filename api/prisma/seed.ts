@@ -151,8 +151,8 @@ const PERMISSIONS = [
   { key: 'patients.read', description: 'View clinical patient registry' },
   { key: 'patients.create', description: 'Register clinical patients' },
   { key: 'patients.update', description: 'Update clinical patient records' },
-  { key: 'complaints.read', description: 'View institutional complaints (High Command)' },
-  { key: 'complaints.create', description: 'Create institutional complaints (High Command)' },
+  { key: 'complaints.read', description: 'View own institutional complaints (all characters)' },
+  { key: 'complaints.create', description: 'Create institutional complaints (all characters)' },
   { key: 'complaints.manage', description: 'Manage complaints (Medical Director)' },
   { key: 'complaints.assign', description: 'Assign complaint investigators (High Command)' },
   { key: 'appointments.read', description: 'View appointments' },
@@ -249,6 +249,8 @@ const CIVILIAN_CORE = [
   'appointments.create',
   'admin-requests.read',
   'admin-requests.create',
+  'complaints.read',
+  'complaints.create',
   'employment-change.create',
   'employment-change.read',
 ] as const;
@@ -318,10 +320,8 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'occupations.read',
   'admin.access',
   'audit.read',
-  // Quejas / gestión de solicitudes / LSPD — High Command and above only
-  // (admin-requests.read/create already in CIVILIAN_CORE for every character)
-  'complaints.read',
-  'complaints.create',
+  // Quejas (gestión) / solicitudes (gestión) / LSPD — High Command and above only
+  // (complaints.read/create and admin-requests.read/create already in CIVILIAN_CORE)
   'complaints.assign',
   'admin-requests.assign',
   'admin-requests.manage',
@@ -390,6 +390,8 @@ const LSPD_MEDICAL_SUPERVISOR_PERMISSIONS = [
   'medical-report-access.read',
   'admin-requests.read',
   'admin-requests.create',
+  'complaints.read',
+  'complaints.create',
   'employment-change.create',
   'employment-change.read',
 ] as const;
@@ -483,9 +485,9 @@ const RANKS = [
     sortOrder: 60,
   },
   {
-    name: 'Administrador',
+    name: 'Directiva',
     slug: 'administrator',
-    description: 'System administrator hierarchy label',
+    description: 'High command / system directive hierarchy label',
     sortOrder: 100,
   },
 ] as const;

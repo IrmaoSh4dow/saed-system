@@ -59,6 +59,18 @@ export class StaffRatingsController {
     return this.staffRatingsService.listMinePending(character.id);
   }
 
+  @Get('eligibility/appointment/:appointmentId')
+  @Permissions('appointments.read')
+  getAppointmentEligibility(
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
+    @CurrentCharacter() character: IAuthCharacter,
+  ) {
+    return this.staffRatingsService.getAppointmentEligibility(
+      appointmentId,
+      character.id,
+    );
+  }
+
   @Get('eligibility/:adminRequestId')
   @Permissions('admin-requests.read')
   getEligibility(

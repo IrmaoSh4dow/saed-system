@@ -41,13 +41,13 @@ export class ComplaintsController {
   }
 
   @Get('investigators/search')
-  @Permissions('complaints.read')
+  @Permissions('complaints.assign')
   searchInvestigators(@Query('q') query = '') {
     return this.complaintsService.searchInvestigators(query);
   }
 
   @Get('by-officer/:staffId')
-  @Permissions('complaints.read')
+  @Permissions('complaints.assign')
   listByOfficer(
     @Param('staffId', ParseUUIDPipe) staffId: string,
     @CurrentCharacter() character: IAuthCharacter,
@@ -100,7 +100,7 @@ export class ComplaintsController {
   }
 
   @Patch(':id/status')
-  @Permissions('complaints.read')
+  @Permissions('complaints.assign')
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,
@@ -116,7 +116,7 @@ export class ComplaintsController {
   }
 
   @Post(':id/assignments')
-  @Permissions('complaints.read')
+  @Permissions('complaints.assign')
   assign(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,
@@ -148,7 +148,7 @@ export class ComplaintsController {
   }
 
   @Post(':id/notes')
-  @Permissions('complaints.read')
+  @Permissions('complaints.assign')
   addNote(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentAccount() account: IAuthAccount,

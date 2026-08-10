@@ -13,6 +13,7 @@ import {
   hasRole,
   resolvePermissionsForCharacter,
 } from '../utils/permissions.js';
+import { formatStaffRankLabel } from '../utils/staff-rank.js';
 
 export function getAuthState() {
   if (isApiAuthEnabled()) {
@@ -68,14 +69,19 @@ function enrichCharacter(character) {
   }
 
   const roles = character.roles?.length ? character.roles : defaultRolesForStatus(character.status);
-  const rankLabel =
+  const rawRank =
     character.rankLabel ??
-    (typeof character.rank === 'string' ? character.rank : character.rank?.name) ??
-    (character.status === 'INTERN'
-      ? 'Interno'
-      : character.status === 'MEDICAL_STAFF'
-        ? 'Personal médico'
-        : 'Ciudadano');
+    (typeof character.rank === 'string' ? character.rank : character.rank) ??
+    null;
+  const formattedRank = rawRank ? formatStaffRankLabel(rawRank) : null;
+  const rankLabel =
+    (formattedRank && formattedRank !== '—')
+      ? formattedRank
+      : character.status === 'INTERN'
+        ? 'Interno'
+        : character.status === 'MEDICAL_STAFF'
+          ? 'Personal médico'
+          : 'Ciudadano';
 
   return {
     ...character,

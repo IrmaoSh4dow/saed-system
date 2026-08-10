@@ -306,7 +306,7 @@ function renderOfficersTable(root, officers, { canDelete, canUpdate, departments
             <tr>
               <td class="px-5 py-3 font-medium text-white">${officer.employeeNumber}</td>
               <td class="px-5 py-3 text-ink-200">${officer.character.firstName} ${officer.character.lastName}</td>
-              <td class="px-5 py-3 text-ink-300">${officer.rank?.name ?? '—'}</td>
+              <td class="px-5 py-3 text-ink-300">${officer.rank?.slug === 'administrator' || officer.rank?.name === 'Administrador' ? 'Directiva' : (officer.rank?.name ?? '—')}</td>
               <td class="px-5 py-3 text-ink-300">${departmentCell}</td>
               <td class="px-5 py-3 text-ink-300">${officer.status}</td>
               <td class="px-5 py-3 text-right">
