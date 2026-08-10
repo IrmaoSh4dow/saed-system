@@ -19,6 +19,7 @@ import {
 } from '../services/appointments.service.js';
 import { createStaffRating } from '../services/staff-ratings.service.js';
 import { subscribeCaseRoom } from '../services/room-subscription.js';
+import { canSendCaseChatMessage, renderClosedChatNotice } from '../utils/case-chat.js';
 import { formatDateLabel, formatDateTimeLabel } from '../utils/date.js';
 import { requireActiveCharacter } from '../utils/auth-guard.js';
 import { getApiBaseUrl } from '../utils/env.js';
@@ -83,6 +84,7 @@ function renderDetail(root, appointment, activeCharacter) {
 
   const canManage = Boolean(appointment.canManage);
   const canSeeInternal = Boolean(appointment.canSeeInternal);
+  const canSendMessages = canSendCaseChatMessage(appointment);
   const assignee = appointment.assignee;
   const assigneeCard = renderAssigneeCard(assignee);
 
@@ -141,12 +143,19 @@ function renderDetail(root, appointment, activeCharacter) {
               : '<p class="text-sm text-ink-400">Sin mensajes aún. Inicia la conversación.</p>'
           }
         </div>
+        ${
+          canSendMessages
+            ? `
         <form id="appointment-message-form" class="shrink-0 border-t border-white/10 p-4">
           <div class="flex flex-col gap-2 sm:flex-row">
             <input id="appointment-message-input" class="form-input min-w-0 flex-1" placeholder="Escribe un mensaje..." required maxlength="4000" />
             <button type="submit" class="btn-primary shrink-0">Enviar</button>
           </div>
-        </form>
+        </form>`
+            : `<div class="shrink-0 border-t border-white/10 p-4">${renderClosedChatNotice(
+                'Esta cita ha finalizado. Puedes consultar el historial del chat, pero ya no se pueden enviar mensajes.',
+              )}</div>`
+        }
       </article>
 
       <aside class="complaint-side-panel space-y-5 xl:col-span-5 xl:sticky xl:top-6 xl:max-h-[min(70vh,40rem)] xl:overflow-y-auto xl:pr-1">

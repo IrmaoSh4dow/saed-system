@@ -11,6 +11,7 @@ import {
   StaffStatus,
   Prisma,
 } from '@prisma/client';
+import { assertCaseChatOpen } from '../../common/utils/case-chat.util';
 import { hasAnyPermission } from '../../common/utils/permission.util';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -37,6 +38,13 @@ const MANAGEMENT_ROLE_SLUGS = ['medical-director', 'deputy-medical-director', 'a
 /** Events never shown to the requesting citizen. */
 const INTERNAL_EVENT_TYPES = new Set<AppointmentEventType>([
   AppointmentEventType.INTERNAL_NOTE_ADDED,
+]);
+
+const TERMINAL_APPOINTMENT_STATUSES = new Set<AppointmentStatus>([
+  AppointmentStatus.COMPLETED,
+  AppointmentStatus.CANCELLED,
+  AppointmentStatus.REJECTED,
+  AppointmentStatus.NO_SHOW,
 ]);
 
 const appointmentInclude = {
@@ -212,6 +220,8 @@ export class AppointmentsService {
       canSeeInternal,
       isRequester,
       isAssignee,
+      isChatClosed: isAppointmentChatClosed(appointment.status),
+      canSendMessages: !isAppointmentChatClosed(appointment.status),
       rating,
     };
   }
@@ -447,6 +457,7 @@ export class AppointmentsService {
   ) {
     await this.getById(id, actor.characterId, actor.permissions);
     const appointment = await this.requireAppointment(id);
+    assertCaseChatOpen(!isAppointmentChatClosed(appointment.status), 'cita');
 
     const message = await this.prismaService.appointmentMessage.create({
       data: {
@@ -670,6 +681,10 @@ export class AppointmentsService {
       assignee: pickPrimaryAssignee(appointment.assignments),
     };
   }
+}
+
+function isAppointmentChatClosed(status: AppointmentStatus): boolean {
+  return TERMINAL_APPOINTMENT_STATUSES.has(status);
 }
 
 function pickPrimaryAssignee(

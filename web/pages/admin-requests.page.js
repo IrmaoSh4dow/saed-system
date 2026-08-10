@@ -28,6 +28,7 @@ import { bindStarRating, renderStarRating } from '../components/ratings/star-rat
 import { subscribeCaseRoom } from '../services/room-subscription.js';
 import { createStaffRating } from '../services/staff-ratings.service.js';
 import { requireActiveCharacter, requireAnyPermission } from '../utils/auth-guard.js';
+import { canSendCaseChatMessage, renderClosedChatNotice } from '../utils/case-chat.js';
 import { formatDateTimeLabel } from '../utils/date.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 import { validateImageUploadFile } from '../utils/image-upload.js';
@@ -244,6 +245,7 @@ export function adminRequestsPage() {
         }
 
         const canManage = Boolean(detail.canManage);
+        const canSendMessages = canSendCaseChatMessage(detail);
         const statusOptions = Object.entries(ADMIN_REQUEST_STATUS_LABELS)
           .map(
             ([value, label]) =>
@@ -299,6 +301,9 @@ export function adminRequestsPage() {
                         .join('')
                     : `<p data-chat-empty class="text-sm text-ink-400">Aún no hay mensajes.</p>`}
                 </div>
+                ${
+                  canSendMessages
+                    ? `
                 <form id="ar-chat-form" class="space-y-3 border-t border-white/8 p-4">
                   <div id="ar-image-preview" class="hidden overflow-hidden rounded-xl border border-white/10">
                     <img alt="" class="max-h-40 w-full object-cover" />
@@ -311,7 +316,11 @@ export function adminRequestsPage() {
                     </label>
                     <button type="submit" class="btn-primary !py-2 !text-sm">Enviar</button>
                   </div>
-                </form>
+                </form>`
+                    : `<div class="border-t border-white/8 p-4">${renderClosedChatNotice(
+                        'Esta solicitud ha finalizado. Puedes consultar el historial del chat, pero ya no se pueden enviar mensajes.',
+                      )}</div>`
+                }
               </section>
 
               <aside class="space-y-4">

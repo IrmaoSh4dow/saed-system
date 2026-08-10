@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { MediaStorageService } from '../../common/storage/media-storage.service';
+import { assertCaseChatOpen } from '../../common/utils/case-chat.util';
 import { hasAnyPermission } from '../../common/utils/permission.util';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -38,6 +39,12 @@ export const COMPLAINT_MANAGE_PERMISSIONS = [
 /** Events never shown to the citizen complainant. */
 const INTERNAL_EVENT_TYPES = new Set<ComplaintEventType>([
   ComplaintEventType.INTERNAL_NOTE_ADDED,
+]);
+
+const TERMINAL_COMPLAINT_STATUSES = new Set<ComplaintStatus>([
+  ComplaintStatus.RESOLVED,
+  ComplaintStatus.REJECTED,
+  ComplaintStatus.CLOSED,
 ]);
 
 const complaintInclude = {
@@ -302,6 +309,10 @@ export class ComplaintsService {
       room: `complaint-${complaint.caseNumber}`,
       canManage,
       canSeeInternal,
+      isComplainant,
+      isAssignee,
+      isChatClosed: isComplaintChatClosed(complaint.status),
+      canSendMessages: !isComplaintChatClosed(complaint.status),
     };
   }
 
@@ -484,6 +495,7 @@ export class ComplaintsService {
   ) {
     await this.getById(id, actor.characterId, actor.permissions);
     const complaint = await this.requireComplaint(id);
+    assertCaseChatOpen(!isComplaintChatClosed(complaint.status), 'queja');
 
     const message = await this.prismaService.complaintMessage.create({
       data: {
@@ -798,6 +810,10 @@ export class ComplaintsService {
       investigator: pickPrimaryInvestigator(complaint.assignments),
     };
   }
+}
+
+function isComplaintChatClosed(status: ComplaintStatus): boolean {
+  return TERMINAL_COMPLAINT_STATUSES.has(status);
 }
 
 function pickPrimaryInvestigator(

@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { MediaStorageService } from '../../common/storage/media-storage.service';
+import { assertCaseChatOpen } from '../../common/utils/case-chat.util';
 import { hasAnyPermission } from '../../common/utils/permission.util';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -54,6 +55,12 @@ const OPEN_STATUSES: AdminRequestStatus[] = [
   AdminRequestStatus.IN_PROCESS,
   AdminRequestStatus.APPROVED,
 ];
+
+const TERMINAL_ADMIN_REQUEST_STATUSES = new Set<AdminRequestStatus>([
+  AdminRequestStatus.REJECTED,
+  AdminRequestStatus.COMPLETED,
+  AdminRequestStatus.CANCELLED,
+]);
 
 const characterSelect = {
   id: true,
@@ -163,6 +170,8 @@ export class AdminRequestsService {
     );
 
     const rating = await this.staffRatingsService.getEligibility(id, characterId);
+    const isRequester = request.requesterId === characterId;
+    const isChatClosed = isAdminRequestChatClosed(request.status);
 
     return {
       ...this.toDetail(request, canManage),
@@ -170,6 +179,9 @@ export class AdminRequestsService {
       internalNotes: notes.map((item) => this.toNote(item)),
       events: events.map((item) => this.toEvent(item)),
       canManage,
+      isRequester,
+      isChatClosed,
+      canSendMessages: !isChatClosed,
       rating,
     };
   }
@@ -404,6 +416,7 @@ export class AdminRequestsService {
   ) {
     await this.getById(id, actor.characterId, actor.permissions);
     const request = await this.requireRequest(id);
+    assertCaseChatOpen(!isAdminRequestChatClosed(request.status), 'solicitud');
 
     const body = dto.body?.trim() || null;
     let imageUrl: string | null = null;
@@ -956,6 +969,10 @@ export class AdminRequestsService {
         : null,
     };
   }
+}
+
+function isAdminRequestChatClosed(status: AdminRequestStatus): boolean {
+  return TERMINAL_ADMIN_REQUEST_STATUSES.has(status);
 }
 
 function endOfDay(date: Date) {
