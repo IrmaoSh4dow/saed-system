@@ -37,7 +37,8 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | `DISCORD_INCENTIVES_WEBHOOK_URL` | No | Webhook de incentivos |
 | `DISCORD_NEWS_WEBHOOK_URL` | No | Webhook al publicar noticias |
 | `DISCORD_APPLICATIONS_WEBHOOK_URL` | No | Webhook al abrir convocatorias (Academia / Traslado) |
-| `PUBLIC_ASSET_BASE_URL` | No | Origen público para assets (API, para imágenes de embeds) |
+| `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | No | Fallback compartido para noticias/postulaciones |
+| `PUBLIC_ASSET_BASE_URL` | No | Origen público HTTPS de la API (imágenes de embeds) |
 
 ### Qué conserva el seed / prune
 

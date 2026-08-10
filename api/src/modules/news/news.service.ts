@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { NewsStatus } from '@prisma/client';
@@ -84,6 +85,8 @@ export class UpdateNewsArticleDto {
 
 @Injectable()
 export class NewsService {
+  private readonly logger = new Logger(NewsService.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
@@ -175,7 +178,7 @@ export class NewsService {
         targetId: article.id,
         metadata: { title: article.title },
       });
-      void this.discordWebhookService.notifyNewsPublished(article).catch(() => undefined);
+      await this.notifyDiscordNewsPublished(article);
     }
 
     return article;
@@ -244,7 +247,7 @@ export class NewsService {
         targetId: article.id,
         metadata: { title: article.title },
       });
-      void this.discordWebhookService.notifyNewsPublished(article).catch(() => undefined);
+      await this.notifyDiscordNewsPublished(article);
     }
 
     return article;
@@ -267,6 +270,29 @@ export class NewsService {
     });
 
     return { id };
+  }
+
+  private async notifyDiscordNewsPublished(article: {
+    id: string;
+    title: string;
+    summary: string;
+    content: string;
+    coverImageUrl: string | null;
+    authorName: string;
+    publishedAt: Date | null;
+  }) {
+    try {
+      const delivered = await this.discordWebhookService.notifyNewsPublished(article);
+      if (!delivered) {
+        this.logger.warn(`Discord news webhook was not delivered for article ${article.id}`);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Discord news webhook error for article ${article.id}: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+      );
+    }
   }
 
   /**

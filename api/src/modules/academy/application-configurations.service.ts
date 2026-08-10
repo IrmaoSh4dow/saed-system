@@ -128,12 +128,14 @@ export class ApplicationConfigurationsService {
     });
 
     if (isOpen) {
-      void this.discordWebhookService
-        .notifyApplicationsOpened({
+      try {
+        await this.discordWebhookService.notifyApplicationsOpened({
           type,
           openedAt: updated.openedAt,
-        })
-        .catch(() => undefined);
+        });
+      } catch {
+        // Announcement failures must not roll back the intake state change.
+      }
     }
 
     return this.toAdminDto(updated);

@@ -33,5 +33,6 @@ export const envValidationSchema = Joi.object({
   DISCORD_INCENTIVES_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
   DISCORD_NEWS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
   DISCORD_APPLICATIONS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
+  DISCORD_ANNOUNCEMENTS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
   PUBLIC_ASSET_BASE_URL: Joi.string().uri().allow('').optional(),
 });

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AcademyApplicationType } from '@prisma/client';
 
@@ -33,17 +33,27 @@ export type IDiscordWebhookPayload = {
 
 const SAED_BRAND_COLOR = 0xb94a42;
 const DESCRIPTION_MAX = 1800;
+const TITLE_MAX = 256;
 
 @Injectable()
-export class DiscordWebhookService {
+export class DiscordWebhookService implements OnModuleInit {
   private readonly logger = new Logger(DiscordWebhookService.name);
 
   constructor(private readonly configService: ConfigService) {}
 
+  onModuleInit(): void {
+    this.logger.log(
+      `Discord webhooks → news:${this.hasWebhook(['discord.newsWebhookUrl'], ['DISCORD_NEWS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
+        `applications:${this.hasWebhook(['discord.applicationsWebhookUrl'], ['DISCORD_APPLICATIONS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
+        `announcements:${this.hasWebhook(['discord.announcementsWebhookUrl'], ['DISCORD_ANNOUNCEMENTS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
+        `shifts:${this.hasWebhook(['discord.shiftsWebhookUrl'], ['DISCORD_SHIFTS_WEBHOOK_URL']) ? 'on' : 'off'}`,
+    );
+  }
+
   async send(webhookUrl: string | undefined, payload: IDiscordWebhookPayload): Promise<boolean> {
     const url = webhookUrl?.trim();
     if (!url) {
-      this.logger.debug('Discord webhook skipped: URL not configured');
+      this.logger.warn('Discord webhook skipped: URL not configured');
       return false;
     }
 
@@ -62,6 +72,7 @@ export class DiscordWebhookService {
         return false;
       }
 
+      this.logger.log(`Discord webhook delivered (${response.status})`);
       return true;
     } catch (error) {
       this.logger.warn(
@@ -72,7 +83,10 @@ export class DiscordWebhookService {
   }
 
   async sendShiftEmbed(embed: IDiscordEmbed): Promise<boolean> {
-    const webhookUrl = this.configService.get<string>('discord.shiftsWebhookUrl');
+    const webhookUrl = this.resolveWebhookUrl(
+      ['discord.shiftsWebhookUrl'],
+      ['DISCORD_SHIFTS_WEBHOOK_URL'],
+    );
     return this.send(webhookUrl, {
       username: 'SAED Duty Desk',
       embeds: [embed],
@@ -80,7 +94,10 @@ export class DiscordWebhookService {
   }
 
   async sendIncentiveEmbed(embed: IDiscordEmbed): Promise<boolean> {
-    const webhookUrl = this.configService.get<string>('discord.incentivesWebhookUrl');
+    const webhookUrl = this.resolveWebhookUrl(
+      ['discord.incentivesWebhookUrl', 'discord.announcementsWebhookUrl'],
+      ['DISCORD_INCENTIVES_WEBHOOK_URL', 'DISCORD_ANNOUNCEMENTS_WEBHOOK_URL'],
+    );
     return this.send(webhookUrl, {
       username: 'SAED Incentives',
       embeds: [embed],
@@ -96,10 +113,29 @@ export class DiscordWebhookService {
     authorName: string;
     publishedAt?: Date | null;
   }): Promise<boolean> {
-    const webhookUrl = this.configService.get<string>('discord.newsWebhookUrl');
+    const webhookUrl = this.resolveWebhookUrl(
+      [
+        'discord.newsWebhookUrl',
+        'discord.announcementsWebhookUrl',
+        'discord.applicationsWebhookUrl',
+      ],
+      [
+        'DISCORD_NEWS_WEBHOOK_URL',
+        'DISCORD_ANNOUNCEMENTS_WEBHOOK_URL',
+        'DISCORD_APPLICATIONS_WEBHOOK_URL',
+        'DISCORD_SHIFTS_WEBHOOK_URL',
+      ],
+    );
+
+    if (!webhookUrl) {
+      this.logger.warn('News Discord webhook skipped: no webhook URL configured');
+      return false;
+    }
+
     const frontendUrl = this.getFrontendUrl();
-    const coverUrl = this.resolvePublicAssetUrl(article.coverImageUrl ?? null);
+    const coverUrl = this.resolveDiscordImageUrl(article.coverImageUrl ?? null);
     const description = this.buildNewsDescription(article.summary, article.content);
+    const title = truncatePlainText(article.title, TITLE_MAX) || 'Nueva noticia';
 
     return this.send(webhookUrl, {
       username: 'SAED Noticias',
@@ -107,12 +143,14 @@ export class DiscordWebhookService {
       allowed_mentions: { parse: ['everyone'] },
       embeds: [
         {
-          title: article.title,
-          description,
+          title,
+          description: description || undefined,
           url: frontendUrl || undefined,
           color: SAED_BRAND_COLOR,
           timestamp: (article.publishedAt ?? new Date()).toISOString(),
-          author: { name: article.authorName },
+          author: article.authorName?.trim()
+            ? { name: truncatePlainText(article.authorName, 256) }
+            : undefined,
           image: coverUrl ? { url: coverUrl } : undefined,
           footer: { text: 'SAED Management System · Noticias' },
           fields: [
@@ -132,7 +170,25 @@ export class DiscordWebhookService {
     type: AcademyApplicationType;
     openedAt?: Date | null;
   }): Promise<boolean> {
-    const webhookUrl = this.configService.get<string>('discord.applicationsWebhookUrl');
+    const webhookUrl = this.resolveWebhookUrl(
+      [
+        'discord.applicationsWebhookUrl',
+        'discord.announcementsWebhookUrl',
+        'discord.newsWebhookUrl',
+      ],
+      [
+        'DISCORD_APPLICATIONS_WEBHOOK_URL',
+        'DISCORD_ANNOUNCEMENTS_WEBHOOK_URL',
+        'DISCORD_NEWS_WEBHOOK_URL',
+        'DISCORD_SHIFTS_WEBHOOK_URL',
+      ],
+    );
+
+    if (!webhookUrl) {
+      this.logger.warn('Applications Discord webhook skipped: no webhook URL configured');
+      return false;
+    }
+
     const frontendUrl = this.getFrontendUrl();
     const isAcademy = input.type === AcademyApplicationType.ACADEMY;
     const title = isAcademy
@@ -203,6 +259,8 @@ export class DiscordWebhookService {
     const base =
       this.configService.get<string>('discord.publicAssetBaseUrl') ||
       this.configService.get<string>('app.frontendUrl') ||
+      process.env.PUBLIC_ASSET_BASE_URL?.trim() ||
+      process.env.FRONTEND_URL?.split(',')[0]?.trim() ||
       '';
     if (!base) {
       return null;
@@ -210,13 +268,65 @@ export class DiscordWebhookService {
     return `${base.replace(/\/$/, '')}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
   }
 
+  /**
+   * Discord can only fetch publicly reachable HTTPS images.
+   * Local/dev absolute URLs are omitted so the embed still delivers.
+   */
+  private resolveDiscordImageUrl(assetUrl: string | null | undefined): string | null {
+    const resolved = this.resolvePublicAssetUrl(assetUrl);
+    if (!resolved) {
+      return null;
+    }
+    try {
+      const parsed = new URL(resolved);
+      if (parsed.protocol !== 'https:') {
+        return null;
+      }
+      if (
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname.endsWith('.local')
+      ) {
+        return null;
+      }
+      return resolved;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveWebhookUrl(configKeys: string[], envKeys: string[]): string {
+    for (const key of configKeys) {
+      const value = this.configService.get<string>(key)?.trim();
+      if (value) {
+        return value;
+      }
+    }
+    for (const key of envKeys) {
+      const value = process.env[key]?.trim();
+      if (value) {
+        return value;
+      }
+    }
+    return '';
+  }
+
+  private hasWebhook(configKeys: string[], envKeys: string[]): boolean {
+    return Boolean(this.resolveWebhookUrl(configKeys, envKeys));
+  }
+
   private getFrontendUrl(): string {
-    return (this.configService.get<string>('app.frontendUrl') || '').replace(/\/$/, '');
+    return (
+      this.configService.get<string>('app.frontendUrl') ||
+      process.env.FRONTEND_URL?.split(',')[0]?.trim() ||
+      ''
+    ).replace(/\/$/, '');
   }
 
   private buildNewsDescription(summary: string, content: string): string {
     const cleanSummary = truncatePlainText(summary, 400);
-    const cleanContent = truncatePlainText(content, DESCRIPTION_MAX - cleanSummary.length - 20);
+    const remaining = Math.max(0, DESCRIPTION_MAX - cleanSummary.length - 20);
+    const cleanContent = truncatePlainText(content, remaining);
     if (!cleanContent || cleanContent === cleanSummary) {
       return cleanSummary;
     }
