@@ -40,6 +40,33 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | No | Fallback compartido para noticias/postulaciones |
 | `PUBLIC_ASSET_BASE_URL` | No | Origen público HTTPS de la API (imágenes de embeds) |
 
+### Discord webhooks (obligatorio configurar en el panel)
+
+El archivo `api/.env` local **no se despliega** a Railway (está en `.gitignore`).
+
+Si en logs aparece `News Discord webhook skipped: no webhook URL configured`, el servicio API de Railway no tiene las variables.
+
+En el **servicio API** (no el frontend), pestaña **Variables**, añade al menos:
+
+```text
+DISCORD_NEWS_WEBHOOK_URL=https://discord.com/api/webhooks/...
+DISCORD_APPLICATIONS_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+Puedes usar el mismo webhook en ambas, o solo:
+
+```text
+DISCORD_ANNOUNCEMENTS_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+Para que Discord muestre la imagen de portada de noticias, también:
+
+```text
+PUBLIC_ASSET_BASE_URL=https://<tu-api>.up.railway.app
+```
+
+Luego **Redeploy** el servicio API. En el arranque deberías ver `Discord webhooks → news:on`.
+
 ### Qué conserva el seed / prune
 
 **Se mantiene**

@@ -128,7 +128,11 @@ export class DiscordWebhookService implements OnModuleInit {
     );
 
     if (!webhookUrl) {
-      this.logger.warn('News Discord webhook skipped: no webhook URL configured');
+      this.logger.warn(
+        'News Discord webhook skipped: no webhook URL configured. ' +
+          'Set DISCORD_NEWS_WEBHOOK_URL or DISCORD_ANNOUNCEMENTS_WEBHOOK_URL on the API service ' +
+          '(Railway → API → Variables), then redeploy.',
+      );
       return false;
     }
 
@@ -185,7 +189,11 @@ export class DiscordWebhookService implements OnModuleInit {
     );
 
     if (!webhookUrl) {
-      this.logger.warn('Applications Discord webhook skipped: no webhook URL configured');
+      this.logger.warn(
+        'Applications Discord webhook skipped: no webhook URL configured. ' +
+          'Set DISCORD_APPLICATIONS_WEBHOOK_URL or DISCORD_ANNOUNCEMENTS_WEBHOOK_URL on the API service ' +
+          '(Railway → API → Variables), then redeploy.',
+      );
       return false;
     }
 

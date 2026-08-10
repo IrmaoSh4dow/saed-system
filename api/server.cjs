@@ -23,6 +23,15 @@ console.log(
     hasFrontendUrl: Boolean(process.env.FRONTEND_URL),
     hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
     hasJwtSecret: Boolean(process.env.JWT_SECRET),
+    hasDiscordNewsWebhook: Boolean(
+      process.env.DISCORD_NEWS_WEBHOOK_URL || process.env.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL,
+    ),
+    hasDiscordApplicationsWebhook: Boolean(
+      process.env.DISCORD_APPLICATIONS_WEBHOOK_URL ||
+        process.env.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL,
+    ),
+    hasDiscordShiftsWebhook: Boolean(process.env.DISCORD_SHIFTS_WEBHOOK_URL),
+    hasPublicAssetBaseUrl: Boolean(process.env.PUBLIC_ASSET_BASE_URL),
   }),
 );
 
