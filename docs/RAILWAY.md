@@ -34,7 +34,10 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | `NODE_ENV` | Recomendada | `production` |
 | `PRUNE_OPERATIONAL_DATA` | No | Default `false`. Solo si es `true` borra informes, pacientes, citas, quejas, etc. (conserva catálogos y `@sh4dow`). |
 | `DISCORD_SHIFTS_WEBHOOK_URL` | No | Webhook de turnos |
-| `PUBLIC_ASSET_BASE_URL` | No | Origen público para assets |
+| `DISCORD_INCENTIVES_WEBHOOK_URL` | No | Webhook de incentivos |
+| `DISCORD_NEWS_WEBHOOK_URL` | No | Webhook al publicar noticias |
+| `DISCORD_APPLICATIONS_WEBHOOK_URL` | No | Webhook al abrir convocatorias (Academia / Traslado) |
+| `PUBLIC_ASSET_BASE_URL` | No | Origen público para assets (API, para imágenes de embeds) |
 
 ### Qué conserva el seed / prune
 

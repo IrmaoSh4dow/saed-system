@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import { MediaStorageService, MAX_IMAGE_DATA_URL_LENGTH } from '../../common/storage/media-storage.service';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
+import { DiscordWebhookService } from '../webhooks/discord-webhook.service';
 
 export class CreateNewsArticleDto {
   @IsString()
@@ -87,6 +88,7 @@ export class NewsService {
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
     private readonly mediaStorageService: MediaStorageService,
+    private readonly discordWebhookService: DiscordWebhookService,
   ) {}
 
   listPublished(limit = 12) {
@@ -173,6 +175,7 @@ export class NewsService {
         targetId: article.id,
         metadata: { title: article.title },
       });
+      void this.discordWebhookService.notifyNewsPublished(article).catch(() => undefined);
     }
 
     return article;
@@ -241,6 +244,7 @@ export class NewsService {
         targetId: article.id,
         metadata: { title: article.title },
       });
+      void this.discordWebhookService.notifyNewsPublished(article).catch(() => undefined);
     }
 
     return article;

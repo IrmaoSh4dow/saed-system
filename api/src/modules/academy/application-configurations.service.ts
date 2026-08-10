@@ -6,6 +6,7 @@ import {
 import { AcademyApplicationType, Prisma } from '@prisma/client';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
 import { PrismaService } from '../../database/prisma.service';
+import { DiscordWebhookService } from '../webhooks/discord-webhook.service';
 
 const KNOWN_APPLICATION_TYPES: AcademyApplicationType[] = [
   AcademyApplicationType.ACADEMY,
@@ -26,6 +27,7 @@ export class ApplicationConfigurationsService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
+    private readonly discordWebhookService: DiscordWebhookService,
   ) {}
 
   async ensureDefaults() {
@@ -124,6 +126,15 @@ export class ApplicationConfigurationsService {
         previousIsOpen: existing.isOpen,
       },
     });
+
+    if (isOpen) {
+      void this.discordWebhookService
+        .notifyApplicationsOpened({
+          type,
+          openedAt: updated.openedAt,
+        })
+        .catch(() => undefined);
+    }
 
     return this.toAdminDto(updated);
   }
