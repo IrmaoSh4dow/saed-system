@@ -27,6 +27,8 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | Variable | Obligatoria | Notas |
 |----------|-------------|-------|
 | `DATABASE_URL` | Sí | Plugin PostgreSQL de Railway |
+| `PRISMA_CONNECTION_LIMIT` | No | Default `5`. Limita el pool de Prisma (menos RAM/conexiones en instancias pequeñas). |
+| `PRISMA_POOL_TIMEOUT` | No | Default `10` (segundos). Solo aplica si `DATABASE_URL` no define ya `pool_timeout`. |
 | `JWT_SECRET` | Sí | ≥ 16 caracteres |
 | `FRONTEND_URL` | Sí | Origen(es) del front, separados por coma |
 | `API_PREFIX` | No | Default `api/v1` |

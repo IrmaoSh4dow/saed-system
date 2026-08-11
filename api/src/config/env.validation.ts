@@ -26,6 +26,8 @@ export const envValidationSchema = Joi.object({
       return value;
     }, 'frontend url(s)'),
   DATABASE_URL: Joi.string().required(),
+  PRISMA_CONNECTION_LIMIT: Joi.number().integer().min(1).max(50).optional(),
+  PRISMA_POOL_TIMEOUT: Joi.number().integer().min(1).max(120).optional(),
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),

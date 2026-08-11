@@ -47,34 +47,37 @@ const TERMINAL_APPOINTMENT_STATUSES = new Set<AppointmentStatus>([
   AppointmentStatus.NO_SHOW,
 ]);
 
-const appointmentInclude = {
-  requester: {
-    select: { id: true, firstName: true, lastName: true, avatarUrl: true, accountId: true },
-  },
-  department: { select: { id: true, name: true, slug: true, imageUrl: true } },
-  assignments: {
-    where: { unassignedAt: null },
-    include: {
-      character: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          avatarUrl: true,
-          accountId: true,
-          staffProfile: {
-            select: {
-              id: true,
-              employeeNumber: true,
-              status: true,
-              department: { select: { id: true, name: true, slug: true, imageUrl: true } },
-              rank: { select: { id: true, name: true } },
-            },
+const appointmentAssignmentInclude = {
+  where: { unassignedAt: null },
+  include: {
+    character: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        accountId: true,
+        staffProfile: {
+          select: {
+            id: true,
+            employeeNumber: true,
+            status: true,
+            department: { select: { id: true, name: true, slug: true, imageUrl: true } },
+            rank: { select: { id: true, name: true } },
           },
         },
       },
     },
   },
+} as const;
+
+/** Detail/write paths: recent events included. */
+const appointmentInclude = {
+  requester: {
+    select: { id: true, firstName: true, lastName: true, avatarUrl: true, accountId: true },
+  },
+  department: { select: { id: true, name: true, slug: true, imageUrl: true } },
+  assignments: appointmentAssignmentInclude,
   events: {
     orderBy: { createdAt: 'desc' as const },
     take: 50,
@@ -82,6 +85,15 @@ const appointmentInclude = {
       actor: { select: { id: true, firstName: true, lastName: true } },
     },
   },
+} satisfies Prisma.AppointmentInclude;
+
+/** List cards only need case metadata + assignee — skip events payloads. */
+const appointmentListInclude = {
+  requester: {
+    select: { id: true, firstName: true, lastName: true, avatarUrl: true, accountId: true },
+  },
+  department: { select: { id: true, name: true, slug: true, imageUrl: true } },
+  assignments: appointmentAssignmentInclude,
 } satisfies Prisma.AppointmentInclude;
 
 @Injectable()
@@ -142,7 +154,7 @@ export class AppointmentsService {
 
     const appointments = canManage
       ? await this.prismaService.appointment.findMany({
-          include: appointmentInclude,
+          include: appointmentListInclude,
           orderBy: { createdAt: 'desc' },
         })
       : await this.prismaService.appointment.findMany({
@@ -152,7 +164,7 @@ export class AppointmentsService {
               { assignments: { some: { characterId, unassignedAt: null } } },
             ],
           },
-          include: appointmentInclude,
+          include: appointmentListInclude,
           orderBy: { createdAt: 'desc' },
         });
 
@@ -670,7 +682,7 @@ export class AppointmentsService {
   }
 
   private toAppointmentSummary(
-    appointment: Prisma.AppointmentGetPayload<{ include: typeof appointmentInclude }>,
+    appointment: Prisma.AppointmentGetPayload<{ include: typeof appointmentListInclude }>,
   ) {
     return {
       ...appointment,
@@ -688,7 +700,7 @@ function isAppointmentChatClosed(status: AppointmentStatus): boolean {
 }
 
 function pickPrimaryAssignee(
-  assignments: Prisma.AppointmentGetPayload<{ include: typeof appointmentInclude }>['assignments'],
+  assignments: Prisma.AppointmentGetPayload<{ include: typeof appointmentListInclude }>['assignments'],
 ) {
   const active = assignments.filter((item) => !item.unassignedAt);
   const primary = active.find((item) => item.isPrimary) ?? active[0] ?? null;

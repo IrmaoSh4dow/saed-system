@@ -624,7 +624,7 @@ export class AgreementsService {
       OR: [{ endsAt: null }, { endsAt: { gte: today } }],
     };
 
-    const patients = await this.prismaService.patient.findMany({
+    return this.prismaService.patient.count({
       where: {
         OR: [
           {
@@ -650,9 +650,7 @@ export class AgreementsService {
           },
         ],
       },
-      select: { id: true },
     });
-    return patients.length;
   }
 
   private async markExpiredAgreements() {

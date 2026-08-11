@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { MAX_IMAGE_UPLOAD_BYTES } from '../storage/media-storage.service';
+import { MAX_IMAGE_UPLOAD_BYTES } from './media-storage.service';
+import { createUploadTempDiskStorage } from './upload-temp.storage';
 
 /** Shared allow-list for gallery, avatars and similar institutional uploads. */
 export const ALLOWED_IMAGE_UPLOAD_MIME = new Set([
@@ -12,11 +12,12 @@ export const ALLOWED_IMAGE_UPLOAD_MIME = new Set([
 
 /**
  * Multipart image upload interceptor (8 MB, JPEG/PNG/WebP).
- * Shared by gallery, character avatars, and other image uploads.
+ * Streams to a temp file on disk (not RAM) before MediaStorageService moves it
+ * into the persistent /uploads Volume path.
  */
 export function imageUploadInterceptor(fieldName = 'file') {
   return FileInterceptor(fieldName, {
-    storage: memoryStorage(),
+    storage: createUploadTempDiskStorage(),
     limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES, files: 1 },
     fileFilter: (_req, file, callback) => {
       const mime = (file.mimetype || '').toLowerCase();

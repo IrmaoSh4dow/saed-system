@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { MAX_DOCUMENT_UPLOAD_BYTES } from './media-storage.service';
+import { createUploadTempDiskStorage } from './upload-temp.storage';
 
 export const ALLOWED_DOCUMENT_UPLOAD_MIME = new Set([
   'image/jpeg',
@@ -16,9 +16,13 @@ export const ALLOWED_DOCUMENT_UPLOAD_MIME = new Set([
   'text/plain',
 ]);
 
+/**
+ * Multipart document upload interceptor (15 MB).
+ * Streams to disk temp storage to avoid holding large buffers in heap.
+ */
 export function documentUploadInterceptor(fieldName = 'file') {
   return FileInterceptor(fieldName, {
-    storage: memoryStorage(),
+    storage: createUploadTempDiskStorage(),
     limits: { fileSize: MAX_DOCUMENT_UPLOAD_BYTES, files: 1 },
     fileFilter: (_req, file, callback) => {
       const mime = (file.mimetype || '').toLowerCase();

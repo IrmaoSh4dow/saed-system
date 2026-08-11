@@ -105,8 +105,21 @@ export class NewsService {
   }
 
   listAll() {
+    // Admin list UI uses title/summary/cover — omit heavy `content` bodies from the list query.
     return this.prismaService.newsArticle.findMany({
       orderBy: [{ updatedAt: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        coverImageUrl: true,
+        authorName: true,
+        authorCharacterId: true,
+        status: true,
+        publishedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 

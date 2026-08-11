@@ -47,6 +47,29 @@ const TERMINAL_COMPLAINT_STATUSES = new Set<ComplaintStatus>([
   ComplaintStatus.CLOSED,
 ]);
 
+const complaintAssignmentInclude = {
+  where: { unassignedAt: null },
+  include: {
+    character: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        accountId: true,
+        staffProfile: {
+          select: {
+            employeeNumber: true,
+            department: { select: { id: true, name: true, slug: true, imageUrl: true } },
+            rank: { select: { id: true, name: true } },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+/** Detail/write paths: full evidence + recent events. */
 const complaintInclude = {
   complainant: {
     select: { id: true, firstName: true, lastName: true, avatarUrl: true, accountId: true },
@@ -61,27 +84,7 @@ const complaintInclude = {
     },
   },
   evidence: { orderBy: { createdAt: 'asc' as const } },
-  assignments: {
-    where: { unassignedAt: null },
-    include: {
-      character: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          avatarUrl: true,
-          accountId: true,
-          staffProfile: {
-            select: {
-              employeeNumber: true,
-              department: { select: { id: true, name: true, slug: true, imageUrl: true } },
-              rank: { select: { id: true, name: true } },
-            },
-          },
-        },
-      },
-    },
-  },
+  assignments: complaintAssignmentInclude,
   events: {
     orderBy: { createdAt: 'desc' as const },
     take: 50,
@@ -89,6 +92,25 @@ const complaintInclude = {
       actor: { select: { id: true, firstName: true, lastName: true } },
     },
   },
+} satisfies Prisma.ComplaintInclude;
+
+/**
+ * List cards only need case metadata + investigator — skip evidence/events payloads.
+ */
+const complaintListInclude = {
+  complainant: {
+    select: { id: true, firstName: true, lastName: true, avatarUrl: true, accountId: true },
+  },
+  accusedStaff: {
+    include: {
+      character: {
+        select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+      },
+      rank: true,
+      department: true,
+    },
+  },
+  assignments: complaintAssignmentInclude,
 } satisfies Prisma.ComplaintInclude;
 
 @Injectable()
@@ -221,7 +243,7 @@ export class ComplaintsService {
 
     const complaints = await this.prismaService.complaint.findMany({
       where: { accusedStaffId: staffProfileId },
-      include: complaintInclude,
+      include: complaintListInclude,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -236,7 +258,7 @@ export class ComplaintsService {
 
     const complaints = canManage
       ? await this.prismaService.complaint.findMany({
-          include: complaintInclude,
+          include: complaintListInclude,
           orderBy: { createdAt: 'desc' },
         })
       : await this.prismaService.complaint.findMany({
@@ -246,7 +268,7 @@ export class ComplaintsService {
               { assignments: { some: { characterId, unassignedAt: null } } },
             ],
           },
-          include: complaintInclude,
+          include: complaintListInclude,
           orderBy: { createdAt: 'desc' },
         });
 
@@ -800,7 +822,7 @@ export class ComplaintsService {
   }
 
   private toComplaintSummary(
-    complaint: Prisma.ComplaintGetPayload<{ include: typeof complaintInclude }>,
+    complaint: Prisma.ComplaintGetPayload<{ include: typeof complaintListInclude }>,
   ) {
     return {
       ...complaint,
@@ -817,7 +839,7 @@ function isComplaintChatClosed(status: ComplaintStatus): boolean {
 }
 
 function pickPrimaryInvestigator(
-  assignments: Prisma.ComplaintGetPayload<{ include: typeof complaintInclude }>['assignments'],
+  assignments: Prisma.ComplaintGetPayload<{ include: typeof complaintListInclude }>['assignments'],
 ) {
   const active = assignments.filter((item) => !item.unassignedAt);
   const primary = active.find((item) => item.isPrimary) ?? active[0] ?? null;

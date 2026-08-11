@@ -14,7 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
+import { createUploadTempDiskStorage } from '../../common/storage/upload-temp.storage';
 import { CurrentAccount } from '../../common/decorators/current-account.decorator';
 import { CurrentCharacter } from '../../common/decorators/current-character.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -165,7 +165,7 @@ export class ReportsController {
   @Permissions('reports.read')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
+      storage: createUploadTempDiskStorage(),
       limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES, files: 1 },
       fileFilter: (_req, file, callback) => {
         const allowed = new Set([

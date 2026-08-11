@@ -1,9 +1,20 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { resolvePrismaDatabaseUrl } from './prisma-database-url.util';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
+
+  constructor() {
+    super({
+      datasources: {
+        db: {
+          url: resolvePrismaDatabaseUrl(process.env.DATABASE_URL),
+        },
+      },
+    });
+  }
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Prisma onModuleInit: connecting...');

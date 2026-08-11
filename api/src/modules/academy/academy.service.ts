@@ -132,7 +132,19 @@ export class AcademyService {
         this.prismaService.academyTraining.findMany({
           where: { status: { not: AcademyTrainingStatus.CANCELLED } },
           orderBy: { startsAt: 'asc' },
-          include: trainingInclude,
+          // Calendar payload is tiny: avoid loading full attendance rosters.
+          select: {
+            id: true,
+            title: true,
+            startsAt: true,
+            location: true,
+            status: true,
+            attendances: {
+              where: { characterId },
+              take: 1,
+              include: { character: { select: characterCardSelect } },
+            },
+          },
         }),
         this.prismaService.academyTrainingAttendance.findMany({
           where: { characterId },
@@ -148,6 +160,8 @@ export class AcademyService {
       ]);
 
     const mapOpts = { isCadet, permissions };
+    const calendarAccess = this.resolveAccess(permissions);
+    const canRespondAttendance = isCadet && !calendarAccess.canManage;
 
     return {
       announcements,
@@ -160,19 +174,16 @@ export class AcademyService {
       myAttendances,
       calendar: {
         ready: true,
-        events: allTrainings.map((item) => {
-          const mapped = this.mapTraining(item, characterId, mapOpts);
-          return {
-            id: item.id,
-            title: item.title,
-            startsAt: item.startsAt,
-            location: item.location,
-            status: item.status,
-            myAttendance: mapped.myAttendance,
-            canRespondAttendance: mapped.access.canRespondAttendance,
-            canManage: mapped.access.canManage,
-          };
-        }),
+        events: allTrainings.map((item) => ({
+          id: item.id,
+          title: item.title,
+          startsAt: item.startsAt,
+          location: item.location,
+          status: item.status,
+          myAttendance: item.attendances[0] ?? null,
+          canRespondAttendance,
+          canManage: calendarAccess.canManage,
+        })),
       },
       access: {
         ...this.resolveAccess(permissions),
