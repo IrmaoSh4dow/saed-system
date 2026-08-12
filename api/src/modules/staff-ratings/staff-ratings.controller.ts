@@ -6,7 +6,6 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAccount } from '../../common/decorators/current-account.decorator';
@@ -47,10 +46,8 @@ export class StaffRatingsController {
 
   @Get('dashboard')
   @Permissions('staff-ratings.read')
-  getDashboard(@Req() request: { user?: { permissions?: string[] } }) {
-    return this.staffRatingsService.getDashboard(
-      request.user?.permissions ?? [],
-    );
+  getDashboard(@CurrentCharacter() character: IAuthCharacter) {
+    return this.staffRatingsService.getDashboard(character.permissions ?? []);
   }
 
   @Get('pending')
@@ -88,11 +85,11 @@ export class StaffRatingsController {
   listForStaff(
     @Param('staffProfileId', ParseUUIDPipe) staffProfileId: string,
     @Query() query: StaffRatingsQueryDto,
-    @Req() request: { user?: { permissions?: string[] } },
+    @CurrentCharacter() character: IAuthCharacter,
   ) {
     return this.staffRatingsService.listForStaff(
       staffProfileId,
-      request.user?.permissions ?? [],
+      character.permissions ?? [],
       query.take ? Number(query.take) : 20,
     );
   }

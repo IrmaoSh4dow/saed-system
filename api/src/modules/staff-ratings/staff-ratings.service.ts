@@ -297,7 +297,6 @@ export class StaffRatingsService {
         by: ['staffProfileId'],
         _avg: { score: true },
         _count: { _all: true },
-        having: { staffProfileId: { _count: { gte: 1 } } },
         orderBy: { _avg: { score: 'desc' } },
         take: 5,
       }),

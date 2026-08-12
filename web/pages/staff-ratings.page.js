@@ -30,8 +30,18 @@ function metric(label, value) {
   `;
 }
 
+function formatRatingSource(item) {
+  if (item?.adminRequest?.requestNumber != null) {
+    return `Solicitud #${item.adminRequest.requestNumber}`;
+  }
+  if (item?.appointment?.caseNumber != null) {
+    return `Cita #${item.appointment.caseNumber}`;
+  }
+  return 'Caso sin referencia';
+}
+
 function staffRow(item) {
-  if (!item?.staff) return '';
+  if (!item?.staff?.id) return '';
   return `
     <button type="button" data-open-staff="${escapeHtml(item.staff.id)}"
       class="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3 text-left transition hover:border-brand-400/30 hover:bg-brand-500/5">
@@ -41,9 +51,28 @@ function staffRow(item) {
       </div>
       <div class="text-right">
         <p class="text-sm font-semibold text-amber-200">${item.averageScore?.toFixed?.(1) ?? '—'}</p>
-        <p class="text-[11px] text-ink-500">${item.totalRatings} val.</p>
+        <p class="text-[11px] text-ink-500">${item.totalRatings ?? 0} val.</p>
       </div>
     </button>
+  `;
+}
+
+function renderRecentItem(item) {
+  const staffName = item?.staffProfile?.fullName ?? 'Personal';
+  const reviewerName = item?.reviewerCharacter?.fullName ?? 'Ciudadano';
+  return `
+    <article class="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3">
+      <div class="min-w-0">
+        <p class="text-sm font-medium text-white">${escapeHtml(staffName)}</p>
+        <p class="mt-1 text-xs text-ink-500">
+          ${escapeHtml(reviewerName)}
+          · ${escapeHtml(formatRatingSource(item))}
+          · ${escapeHtml(formatDateTimeLabel(item.createdAt))}
+        </p>
+        ${item.comment ? `<p class="mt-2 text-sm text-ink-300">${escapeHtml(item.comment)}</p>` : ''}
+      </div>
+      ${renderStarRating({ value: item.score, interactive: false, size: 'sm', label: '' })}
+    </article>
   `;
 }
 
@@ -133,8 +162,8 @@ export function staffRatingsPage() {
                               </div>
                               <p class="mt-2 text-sm text-ink-200">${escapeHtml(item.comment || 'Sin comentario')}</p>
                               <p class="mt-2 text-xs text-ink-500">
-                                ${escapeHtml(item.reviewerCharacter.fullName)}
-                                · Solicitud #${item.adminRequest.requestNumber}
+                                ${escapeHtml(item.reviewerCharacter?.fullName ?? 'Ciudadano')}
+                                · ${escapeHtml(formatRatingSource(item))}
                               </p>
                             </article>
                           `,
@@ -158,52 +187,42 @@ export function staffRatingsPage() {
       const load = async () => {
         try {
           const data = await getStaffRatingsDashboard();
+          const topRatedHtml =
+            (data.topRated ?? []).map(staffRow).filter(Boolean).join('') ||
+            `<p class="text-sm text-ink-400">Sin datos aún.</p>`;
+          const mostRatedHtml =
+            (data.mostRated ?? []).map(staffRow).filter(Boolean).join('') ||
+            `<p class="text-sm text-ink-400">Sin datos aún.</p>`;
+          const recentHtml =
+            data.recent?.length > 0
+              ? data.recent.map(renderRecentItem).join('')
+              : `<p class="text-sm text-ink-400">Todavía no hay valoraciones registradas.</p>`;
+
           host.innerHTML = `
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               ${metric('Promedio hospital', data.hospitalAverage?.toFixed?.(1) ?? '—')}
-              ${metric('Total valoraciones', data.totalRatings)}
-              ${metric('Este mes', data.ratingsThisMonth)}
-              ${metric('Pendientes', data.pendingRatings)}
+              ${metric('Total valoraciones', data.totalRatings ?? 0)}
+              ${metric('Este mes', data.ratingsThisMonth ?? 0)}
+              ${metric('Pendientes', data.pendingRatings ?? 0)}
             </div>
             <div class="mt-6 grid gap-4 xl:grid-cols-2">
               <section class="rounded-3xl border border-white/10 p-5">
                 <h3 class="text-sm font-semibold text-white">Mejor valorados</h3>
                 <div class="mt-4 space-y-2">
-                  ${data.topRated?.map(staffRow).join('') || `<p class="text-sm text-ink-400">Sin datos aún.</p>`}
+                  ${topRatedHtml}
                 </div>
               </section>
               <section class="rounded-3xl border border-white/10 p-5">
                 <h3 class="text-sm font-semibold text-white">Con más valoraciones</h3>
                 <div class="mt-4 space-y-2">
-                  ${data.mostRated?.map(staffRow).join('') || `<p class="text-sm text-ink-400">Sin datos aún.</p>`}
+                  ${mostRatedHtml}
                 </div>
               </section>
             </div>
             <section class="mt-6 rounded-3xl border border-white/10 p-5">
               <h3 class="text-sm font-semibold text-white">Actividad reciente</h3>
               <div class="mt-4 space-y-3">
-                ${
-                  data.recent?.length
-                    ? data.recent
-                        .map(
-                          (item) => `
-                            <article class="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3">
-                              <div class="min-w-0">
-                                <p class="text-sm font-medium text-white">${escapeHtml(item.staffProfile.fullName)}</p>
-                                <p class="mt-1 text-xs text-ink-500">
-                                  ${escapeHtml(item.reviewerCharacter.fullName)}
-                                  · #${item.adminRequest.requestNumber}
-                                  · ${escapeHtml(formatDateTimeLabel(item.createdAt))}
-                                </p>
-                                ${item.comment ? `<p class="mt-2 text-sm text-ink-300">${escapeHtml(item.comment)}</p>` : ''}
-                              </div>
-                              ${renderStarRating({ value: item.score, interactive: false, size: 'sm', label: '' })}
-                            </article>
-                          `,
-                        )
-                        .join('')
-                    : `<p class="text-sm text-ink-400">Todavía no hay valoraciones registradas.</p>`
-                }
+                ${recentHtml}
               </div>
             </section>
           `;
