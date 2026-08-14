@@ -26,7 +26,7 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 
 | Variable | Obligatoria | Notas |
 |----------|-------------|-------|
-| `DATABASE_URL` | Sí | Plugin PostgreSQL de Railway |
+| `DATABASE_URL` | Sí | PostgreSQL. En producción usar **Supabase** (URI directa `:5432`) con `?sslmode=require`. |
 | `PRISMA_CONNECTION_LIMIT` | No | Default `5`. Limita el pool de Prisma (menos RAM/conexiones en instancias pequeñas). |
 | `PRISMA_POOL_TIMEOUT` | No | Default `10` (segundos). Solo aplica si `DATABASE_URL` no define ya `pool_timeout`. |
 | `JWT_SECRET` | Sí | ≥ 16 caracteres |
@@ -68,6 +68,22 @@ PUBLIC_ASSET_BASE_URL=https://<tu-api>.up.railway.app
 ```
 
 Luego **Redeploy** el servicio API. En el arranque deberías ver `Discord webhooks → news:on`.
+
+### Supabase (PostgreSQL)
+
+La API usa PostgreSQL gestionado en **Supabase**. En el servicio API de Railway, `DATABASE_URL` debe apuntar a la URI **directa** (puerto `5432`), no al pooler de transacciones si vas a ejecutar `prisma migrate deploy` en el start command.
+
+Ejemplo (sin pegar la contraseña en el repo):
+
+```text
+DATABASE_URL=postgresql://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres?sslmode=require&schema=public
+```
+
+Notas:
+
+- `sslmode=require` es obligatorio.
+- Mantén `PRUNE_OPERATIONAL_DATA=false` (o sin definir) para no borrar datos operativos en cada deploy.
+- Para migrar datos desde otra Postgres local/Railway: `api/scripts/migrate-to-supabase.js` (usa `TARGET_DATABASE_URL` en el entorno; nunca la subas a git).
 
 ### Qué conserva el seed / prune
 

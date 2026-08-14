@@ -33,4 +33,11 @@ describe('resolvePrismaDatabaseUrl', () => {
     expect(resolved).toContain('connection_limit=3');
     expect(resolved).toContain('pool_timeout=20');
   });
+
+  it('adds sslmode require for Supabase hosts', () => {
+    const resolved = resolvePrismaDatabaseUrl(
+      'postgresql://postgres:pass@db.example.supabase.co:5432/postgres',
+    );
+    expect(resolved).toContain('sslmode=require');
+  });
 });

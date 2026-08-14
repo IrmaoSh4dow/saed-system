@@ -29,6 +29,9 @@ temp/
 tmp/
 .tmp/
 .cache/
+*.dump
+tmp-supabase-migration.dump
+api/tmp-supabase-migration.dump
 
 # IDE / editor
 .idea/

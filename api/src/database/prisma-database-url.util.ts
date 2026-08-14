@@ -24,6 +24,13 @@ export function resolvePrismaDatabaseUrl(
     if (!parsed.searchParams.has('pool_timeout')) {
       parsed.searchParams.set('pool_timeout', String(poolTimeout));
     }
+    // Supabase (and most managed Postgres) require TLS.
+    if (
+      !parsed.searchParams.has('sslmode') &&
+      /\.supabase\.co$/i.test(parsed.hostname)
+    ) {
+      parsed.searchParams.set('sslmode', 'require');
+    }
     return parsed.toString();
   } catch {
     return databaseUrl;
