@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'crypto';
 import {
   closeSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   openSync,
@@ -61,6 +62,8 @@ type UploadedFileInput = {
 
 @Injectable()
 export class MediaStorageService {
+  private readonly logger = new Logger(MediaStorageService.name);
+
   constructor(private readonly configService: ConfigService) {}
 
   /**
@@ -254,9 +257,13 @@ export class MediaStorageService {
     const destination = join(uploadRoot, fileName);
 
     try {
-      renameSync(tempPath, destination);
-    } catch {
+      this.moveUploadedFile(tempPath, destination);
+    } catch (error) {
       this.cleanupTempFile(tempPath);
+      this.logger.error(
+        `Failed to persist upload into ${destination}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new BadRequestException('No se pudo guardar el archivo subido');
     }
 
@@ -264,6 +271,27 @@ export class MediaStorageService {
       fileUrl: `/uploads/${folder}/${fileName}`,
       sizeBytes,
     };
+  }
+
+  /**
+   * Prefer rename (same filesystem / Volume). Fall back to copy+unlink when
+   * source and destination are on different devices (EXDEV on Railway).
+   */
+  private moveUploadedFile(sourcePath: string, destinationPath: string): void {
+    try {
+      renameSync(sourcePath, destinationPath);
+      return;
+    } catch {
+      // Cross-device rename (EXDEV) is common on Railway Volumes.
+      // Fall back to copy + unlink so uploads still land on the Volume.
+    }
+
+    copyFileSync(sourcePath, destinationPath);
+    try {
+      unlinkSync(sourcePath);
+    } catch {
+      // Destination is already durable; temp cleanup is best-effort.
+    }
   }
 
   private writeBuffer(

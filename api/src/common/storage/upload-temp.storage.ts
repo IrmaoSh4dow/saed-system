@@ -4,11 +4,12 @@ import { extname, join } from 'path';
 import { diskStorage, StorageEngine } from 'multer';
 
 /**
- * Temp directory for multipart uploads (outside /uploads so Express static never serves them).
- * Files are moved into the Railway Volume path by MediaStorageService.
+ * Temp directory for multipart uploads.
+ * Kept under /uploads so it lands on the same Railway Volume as final files
+ * (rename across devices fails with EXDEV).
  */
 export function getUploadTempDirectory(): string {
-  return join(process.cwd(), '.upload-tmp');
+  return join(process.cwd(), 'uploads', '.tmp');
 }
 
 export function ensureUploadTempDirectory(): string {
@@ -25,7 +26,11 @@ export function ensureUploadTempDirectory(): string {
 export function createUploadTempDiskStorage(): StorageEngine {
   return diskStorage({
     destination: (_request, _file, callback) => {
-      callback(null, ensureUploadTempDirectory());
+      try {
+        callback(null, ensureUploadTempDirectory());
+      } catch (error) {
+        callback(error as Error, '');
+      }
     },
     filename: (_request, file, callback) => {
       const extension = extname(file.originalname || '').toLowerCase().slice(0, 16);

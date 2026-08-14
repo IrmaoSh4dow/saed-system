@@ -57,6 +57,11 @@ export async function attachNestToServer(
     `config apiPrefix=${apiPrefix} frontendUrl=${frontendUrl} cors=${corsOrigins.join(',')}`,
   );
 
+  // Temp multipart files live under uploads/.tmp — never serve them publicly.
+  expressApp.use('/uploads/.tmp', (_request, response) => {
+    response.status(404).end();
+  });
+
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads',
   });
