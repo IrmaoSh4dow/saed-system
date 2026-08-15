@@ -10,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { parseCorsOrigins } from '../common/utils/cors-origins.util';
+import { PrismaService } from '../database/prisma.service';
 import { IJwtPayload } from '../modules/auth/interfaces/i-jwt-payload.interface';
 
 interface ISocketAuthData {
@@ -32,6 +33,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   afterInit(): void {
@@ -40,6 +42,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   async handleConnection(client: Socket): Promise<void> {
     try {
+      void this.prismaService.ensureConnected();
       const token = this.extractToken(client);
 
       if (!token) {

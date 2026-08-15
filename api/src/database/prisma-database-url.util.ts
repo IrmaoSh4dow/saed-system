@@ -1,6 +1,6 @@
 /**
- * Caps Prisma's PostgreSQL connection pool for small Railway instances.
- * Existing query params are preserved; values already set in DATABASE_URL win.
+ * Prisma PostgreSQL pool settings for long-lived app processes (Railway / Supabase).
+ * Existing query params in DATABASE_URL always win.
  */
 export function resolvePrismaDatabaseUrl(
   databaseUrl: string | undefined,
@@ -13,8 +13,11 @@ export function resolvePrismaDatabaseUrl(
     return databaseUrl;
   }
 
-  const connectionLimit = options?.connectionLimit ?? readPositiveInt(process.env.PRISMA_CONNECTION_LIMIT, 5);
-  const poolTimeout = options?.poolTimeout ?? readPositiveInt(process.env.PRISMA_POOL_TIMEOUT, 10);
+  // Keep a warm pool for interactive traffic. Idle teardown is handled in PrismaService.
+  const connectionLimit =
+    options?.connectionLimit ?? readPositiveInt(process.env.PRISMA_CONNECTION_LIMIT, 10);
+  const poolTimeout =
+    options?.poolTimeout ?? readPositiveInt(process.env.PRISMA_POOL_TIMEOUT, 60);
 
   try {
     const parsed = new URL(databaseUrl);
@@ -37,7 +40,14 @@ export function resolvePrismaDatabaseUrl(
   }
 }
 
-function readPositiveInt(value: string | undefined, fallback: number): number {
+export function resolvePrismaIdleTtlMs(
+  value: string | undefined = process.env.PRISMA_IDLE_TTL_MS,
+): number {
+  // Default: close the pool after 10 minutes without application traffic.
+  return readPositiveInt(value, 10 * 60 * 1000);
+}
+
+export function readPositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1) {
     return fallback;
