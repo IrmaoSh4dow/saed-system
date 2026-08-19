@@ -2,6 +2,7 @@
 
 [build]
 builder = "NIXPACKS"
+# Install includes build tooling; Nest CLI lives in dependencies for production images.
 buildCommand = "npm run build"
 
 [deploy]

@@ -1,6 +1,10 @@
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+# Ensure build tooling (Nest CLI, TypeScript) is installed even when NODE_ENV=production.
 NPM_CONFIG_PRODUCTION = "false"
+
+[phases.install]
+cmds = ["npm install --include=dev"]
 
 [start]
 cmd = "node server.cjs"
