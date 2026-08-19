@@ -1,5 +1,4 @@
-import { Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { PrismaActivityMiddleware } from './prisma-activity.middleware';
+import { Global, Module } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 
 @Global()
@@ -7,8 +6,4 @@ import { PrismaService } from './prisma.service';
   providers: [PrismaService],
   exports: [PrismaService],
 })
-export class PrismaModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(PrismaActivityMiddleware).forRoutes('*');
-  }
-}
+export class PrismaModule {}

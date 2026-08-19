@@ -27,9 +27,8 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | Variable | Obligatoria | Notas |
 |----------|-------------|-------|
 | `DATABASE_URL` | Sí | PostgreSQL. En producción usar **Supabase** (URI directa `:5432`) con `?sslmode=require`. |
-| `PRISMA_CONNECTION_LIMIT` | No | Default `10`. Tamaño del pool cálido de Prisma. |
+| `PRISMA_CONNECTION_LIMIT` | No | Default `10`. Tamaño del pool persistente de Prisma. |
 | `PRISMA_POOL_TIMEOUT` | No | Default `60` (segundos de espera por una conexión libre del pool). |
-| `PRISMA_IDLE_TTL_MS` | No | Default `600000` (10 min). Cierra el pool si no hay tráfico de aplicación. |
 | `JWT_SECRET` | Sí | ≥ 16 caracteres |
 | `FRONTEND_URL` | Sí | Origen(es) del front, separados por coma |
 | `API_PREFIX` | No | Default `api/v1` |

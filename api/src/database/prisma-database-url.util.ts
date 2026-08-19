@@ -1,5 +1,5 @@
 /**
- * Prisma PostgreSQL pool settings for long-lived app processes (Railway / Supabase).
+ * Prisma PostgreSQL pool settings for long-lived app processes (Railway).
  * Existing query params in DATABASE_URL always win.
  */
 export function resolvePrismaDatabaseUrl(
@@ -13,7 +13,7 @@ export function resolvePrismaDatabaseUrl(
     return databaseUrl;
   }
 
-  // Keep a warm pool for interactive traffic. Idle teardown is handled in PrismaService.
+  // Persistent warm pool — do not tear down between requests.
   const connectionLimit =
     options?.connectionLimit ?? readPositiveInt(process.env.PRISMA_CONNECTION_LIMIT, 10);
   const poolTimeout =
@@ -38,13 +38,6 @@ export function resolvePrismaDatabaseUrl(
   } catch {
     return databaseUrl;
   }
-}
-
-export function resolvePrismaIdleTtlMs(
-  value: string | undefined = process.env.PRISMA_IDLE_TTL_MS,
-): number {
-  // Default: close the pool after 10 minutes without application traffic.
-  return readPositiveInt(value, 10 * 60 * 1000);
 }
 
 export function readPositiveInt(value: string | undefined, fallback: number): number {

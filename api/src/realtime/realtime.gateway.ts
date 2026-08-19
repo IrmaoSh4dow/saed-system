@@ -10,7 +10,6 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { parseCorsOrigins } from '../common/utils/cors-origins.util';
-import { PrismaService } from '../database/prisma.service';
 import { IJwtPayload } from '../modules/auth/interfaces/i-jwt-payload.interface';
 
 interface ISocketAuthData {
@@ -23,6 +22,11 @@ interface ISocketAuthData {
     origin: parseCorsOrigins(process.env.FRONTEND_URL),
     credentials: true,
   },
+  // Keep sockets warm behind Railway proxies; avoid aggressive timeouts.
+  transports: ['websocket', 'polling'],
+  pingInterval: 25_000,
+  pingTimeout: 60_000,
+  connectTimeout: 20_000,
 })
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RealtimeGateway.name);
@@ -33,7 +37,6 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly prismaService: PrismaService,
   ) {}
 
   afterInit(): void {
@@ -42,7 +45,6 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      void this.prismaService.ensureConnected();
       const token = this.extractToken(client);
 
       if (!token) {
