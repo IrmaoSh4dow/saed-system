@@ -31,7 +31,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect();
       this.logger.log('Prisma connected to PostgreSQL (persistent pool)');
-      await this.reportRoundTripLatency();
+      // Diagnostic only: never hold up module init waiting on the database.
+      void this.reportRoundTripLatency();
     } catch (error) {
       // Do not kill the HTTP process on Railway: without listen() the proxy returns 502.
       // /health will report database: down so the failure remains visible.

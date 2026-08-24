@@ -16,11 +16,14 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 ### Build / start
 
 1. **Build:** `npm run build` (`prisma generate` + `nest build`)
-2. **Start:**
+2. **Start:** `node server.cjs`, que ejecuta en este orden:
+   - `listen` en `0.0.0.0:$PORT` → el puerto se abre **antes** que cualquier otra cosa
    - `npx prisma migrate deploy` → aplica migraciones sobre `DATABASE_URL` (conserva datos)
    - `npm run prisma:seed` → catálogos + cuenta `@sh4dow` + prune operativo (ver abajo)
-   - `node server.cjs` → escucha `0.0.0.0:$PORT`, health en `/health`
+   - arranque de Nest
 3. **Healthcheck:** `GET /health` (timeout 300s para dar margen a migrate/seed)
+
+Ningún paso puede tumbar el proceso. Si migrate o seed fallan, el puerto sigue abierto y `/health` responde `200` con `status: "degraded"` indicando qué paso falló. Esto es intencionado: encadenar `migrate && seed && node server.cjs` en el start command hacía que cualquier fallo dejara el puerto cerrado y Railway solo reportara `service unavailable`, sin pista de la causa.
 
 ### Variables (panel del servicio API)
 
@@ -31,6 +34,8 @@ El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no
 | `PRISMA_POOL_TIMEOUT` | No | Default `60` (segundos de espera por una conexión libre del pool). |
 | `AUTH_CONTEXT_CACHE_TTL_MS` | No | Default `45000`. Cache en memoria del contexto JWT (cuenta/personaje/permisos). |
 | `SLOW_REQUEST_LOG_MS` | No | Default `2000`. Umbral para registrar `Slow request METHOD /ruta took Xms`. |
+| `SKIP_PRISMA_MIGRATE` | No | `true` para no ejecutar `prisma migrate deploy` en el arranque. |
+| `SKIP_PRISMA_SEED` | No | `true` para no ejecutar el seed en el arranque. |
 | `JWT_SECRET` | Sí | ≥ 16 caracteres |
 | `FRONTEND_URL` | Sí | Origen(es) del front, separados por coma |
 | `API_PREFIX` | No | Default `api/v1` |

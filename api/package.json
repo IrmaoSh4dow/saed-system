@@ -16,7 +16,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node server.cjs",
-    "start:railway": "npx prisma migrate deploy && npm run prisma:seed && node server.cjs",
+    "start:railway": "node server.cjs",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:release": "prisma migrate deploy && prisma db seed",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
