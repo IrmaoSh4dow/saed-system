@@ -21,21 +21,51 @@ export class PermissionsService {
   }
 
   async getPermissionKeysForCharacter(characterId: string): Promise<string[]> {
-    const characterRoles = await this.prismaService.characterRole.findMany({
-      where: { characterId },
-      include: {
-        role: {
-          include: {
-            permissions: {
-              include: {
-                permission: true,
+    const { permissions } = await this.resolveAuthorization(characterId);
+    return permissions;
+  }
+
+  async getRoleSlugsForCharacter(characterId: string): Promise<string[]> {
+    const { roles } = await this.resolveAuthorization(characterId);
+    return roles;
+  }
+
+  /**
+   * Single-pass authorization resolution for JWT / request auth context.
+   * Replaces the previous multi-query role + permission + supervisor path.
+   */
+  async resolveAuthorization(
+    characterId: string,
+    options?: {
+      characterStatus?: CharacterStatus;
+      staffProfileId?: string | null;
+    },
+  ): Promise<{ roles: string[]; permissions: string[] }> {
+    const [characterRoles, staffProfile] = await Promise.all([
+      this.prismaService.characterRole.findMany({
+        where: { characterId },
+        include: {
+          role: {
+            select: {
+              slug: true,
+              permissions: {
+                include: {
+                  permission: { select: { key: true } },
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+      options?.staffProfileId !== undefined
+        ? Promise.resolve(options.staffProfileId ? { id: options.staffProfileId } : null)
+        : this.prismaService.staffProfile.findUnique({
+            where: { characterId },
+            select: { id: true },
+          }),
+    ]);
 
+    const roles = characterRoles.map((item) => item.role.slug).sort();
     const keys = new Set<string>();
 
     for (const characterRole of characterRoles) {
@@ -44,26 +74,48 @@ export class PermissionsService {
       }
     }
 
-    if (await this.isMedicalAcademySupervisor(characterId)) {
+    const staffProfileId = staffProfile?.id ?? null;
+    const [isSupervisor, characterStatus] = await Promise.all([
+      staffProfileId
+        ? this.prismaService.departmentSupervisor
+            .findFirst({
+              where: {
+                staffProfileId,
+                department: { slug: MEDICAL_ACADEMY_DEPARTMENT_SLUG, isActive: true },
+              },
+              select: { id: true },
+            })
+            .then((row) => Boolean(row))
+        : Promise.resolve(false),
+      options?.characterStatus
+        ? Promise.resolve(options.characterStatus)
+        : this.prismaService.character
+            .findUnique({
+              where: { id: characterId },
+              select: { status: true },
+            })
+            .then((row) => row?.status ?? null),
+    ]);
+
+    if (isSupervisor) {
       for (const key of MEDICAL_ACADEMY_SUPERVISOR_PERMISSIONS) {
         keys.add(key);
       }
     }
 
-    if (await this.belongsToSaed(characterId)) {
+    const belongsToSaed =
+      Boolean(staffProfileId) ||
+      characterStatus === CharacterStatus.INTERN ||
+      characterStatus === CharacterStatus.MEDICAL_STAFF;
+
+    if (belongsToSaed) {
       keys.delete('academy.apply');
     }
 
-    return [...keys].sort();
-  }
-
-  async getRoleSlugsForCharacter(characterId: string): Promise<string[]> {
-    const characterRoles = await this.prismaService.characterRole.findMany({
-      where: { characterId },
-      include: { role: true },
-    });
-
-    return characterRoles.map((item) => item.role.slug).sort();
+    return {
+      roles,
+      permissions: [...keys].sort(),
+    };
   }
 
   async isMedicalAcademySupervisor(characterId: string): Promise<boolean> {

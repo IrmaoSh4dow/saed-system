@@ -17,10 +17,7 @@ import { isLspdEstablishment } from '../patients/utils/patient-establishment.uti
 import { AvatarStorageService } from './avatar-storage.service';
 import { MAX_CHARACTERS_PER_ACCOUNT } from './constants/characters.constants';
 import { CreateCharacterDto } from './dto/create-character.dto';
-import {
-  ICharacterResponseDto,
-  toCharacterResponseDto,
-} from './dto/character-response.dto';
+import { ICharacterResponseDto, toCharacterResponseDto } from './dto/character-response.dto';
 import { ListCharactersDirectoryDto } from './dto/list-characters-directory.dto';
 import { UpdateCharacterDto } from './dto/update-character.dto';
 import { UpdateMyCharacterDto } from './dto/update-my-character.dto';
@@ -301,13 +298,10 @@ export class CharactersService {
         lastName: dto.lastName?.trim(),
         birthDate: dto.birthDate !== undefined ? parseOptionalDate(dto.birthDate) : undefined,
         sex: dto.sex,
-        nationality:
-          dto.nationality !== undefined ? dto.nationality.trim() || null : undefined,
+        nationality: dto.nationality !== undefined ? dto.nationality.trim() || null : undefined,
         rankId: dto.rankId === undefined ? undefined : dto.rankId,
         fivemCitizenId:
-          dto.fivemCitizenId === undefined
-            ? undefined
-            : dto.fivemCitizenId?.trim() || null,
+          dto.fivemCitizenId === undefined ? undefined : dto.fivemCitizenId?.trim() || null,
         status: dto.status,
       },
       include: characterInclude,
@@ -349,15 +343,9 @@ export class CharactersService {
                 ? parseOptionalDate(dto.birthDate)
                 : null,
           sex: dto.sex,
-          nationality:
-            dto.nationality === undefined
-              ? undefined
-              : dto.nationality?.trim() || null,
+          nationality: dto.nationality === undefined ? undefined : dto.nationality?.trim() || null,
           phone: dto.phone === undefined ? undefined : dto.phone?.trim() || null,
-          biography:
-            dto.biography === undefined
-              ? undefined
-              : dto.biography?.trim() || null,
+          biography: dto.biography === undefined ? undefined : dto.biography?.trim() || null,
         },
         include: characterInclude,
       });
@@ -504,10 +492,12 @@ export class CharactersService {
       },
     });
 
-    return this.prismaService.character.findUniqueOrThrow({
-      where: { id: characterId },
-      include: characterInclude,
-    }).then(toCharacterResponseDto);
+    return this.prismaService.character
+      .findUniqueOrThrow({
+        where: { id: characterId },
+        include: characterInclude,
+      })
+      .then(toCharacterResponseDto);
   }
 
   async uploadAvatar(
@@ -563,9 +553,8 @@ export class CharactersService {
       return;
     }
 
-    const workplace = await this.establishmentsService.findSelectableByOrganization(
-      organizationName,
-    );
+    const workplace =
+      await this.establishmentsService.findSelectableByOrganization(organizationName);
     if (!workplace) {
       return;
     }
@@ -593,12 +582,22 @@ export class CharactersService {
       };
     }
 
-    await this.findByIdForAccount(activeCharacterId, accountId);
+    const character = await this.prismaService.character.findFirst({
+      where: { id: activeCharacterId, accountId },
+      select: { id: true, status: true, staffProfile: { select: { id: true } } },
+    });
 
-    const [roles, permissions] = await Promise.all([
-      this.permissionsService.getRoleSlugsForCharacter(activeCharacterId),
-      this.permissionsService.getPermissionKeysForCharacter(activeCharacterId),
-    ]);
+    if (!character) {
+      throw new NotFoundException('Character was not found');
+    }
+
+    const { roles, permissions } = await this.permissionsService.resolveAuthorization(
+      character.id,
+      {
+        characterStatus: character.status,
+        staffProfileId: character.staffProfile?.id ?? null,
+      },
+    );
 
     return {
       characterId: activeCharacterId,
@@ -607,6 +606,10 @@ export class CharactersService {
     };
   }
 
+  /**
+   * Full character payload for session endpoints (/auth/me, login, refresh, select).
+   * The frontend renders staff profile, occupations and decorations from this shape.
+   */
   async buildAuthContext(characterId: string, accountId: string) {
     const character = await this.findByIdForAccount(characterId, accountId);
 
@@ -614,14 +617,79 @@ export class CharactersService {
       throw new ForbiddenException('Character does not belong to this account');
     }
 
-    const [roles, permissions] = await Promise.all([
-      this.permissionsService.getRoleSlugsForCharacter(character.id),
-      this.permissionsService.getPermissionKeysForCharacter(character.id),
-    ]);
+    const { roles, permissions } = await this.permissionsService.resolveAuthorization(
+      character.id,
+      {
+        characterStatus: character.status,
+        staffProfileId: character.staffProfile?.id ?? null,
+      },
+    );
 
     return {
       ...toCharacterResponseDto(character, roles),
       permissions,
+    };
+  }
+
+  /**
+   * Lean auth context for the per-request JWT hot path.
+   * Skips decorations/licenses/occupations graphs that guards never read.
+   */
+  async buildRequestAuthContext(characterId: string, accountId: string) {
+    const character = await this.prismaService.character.findFirst({
+      where: { id: characterId, accountId },
+      select: {
+        id: true,
+        accountId: true,
+        firstName: true,
+        lastName: true,
+        birthDate: true,
+        sex: true,
+        nationality: true,
+        avatarUrl: true,
+        status: true,
+        fivemCitizenId: true,
+        joinedAt: true,
+        rank: { select: { id: true, name: true, slug: true } },
+        staffProfile: {
+          select: {
+            id: true,
+            rank: { select: { id: true, name: true, slug: true } },
+          },
+        },
+      },
+    });
+
+    if (!character) {
+      throw new NotFoundException('Character was not found');
+    }
+
+    const { roles, permissions } = await this.permissionsService.resolveAuthorization(
+      character.id,
+      {
+        characterStatus: character.status,
+        staffProfileId: character.staffProfile?.id ?? null,
+      },
+    );
+
+    const rank = character.rank ?? character.staffProfile?.rank ?? null;
+
+    return {
+      id: character.id,
+      accountId: character.accountId,
+      firstName: character.firstName,
+      lastName: character.lastName,
+      birthDate: toDateOnlyString(character.birthDate),
+      sex: character.sex,
+      nationality: character.nationality,
+      avatarUrl: character.avatarUrl,
+      status: character.status,
+      roles,
+      permissions,
+      rankLabel: rank?.name ?? null,
+      rank: rank ? { id: rank.id, name: rank.name, slug: rank.slug } : null,
+      fivemCitizenId: character.fivemCitizenId,
+      joinedAt: toDateOnlyString(character.joinedAt),
     };
   }
 
@@ -640,6 +708,10 @@ export class CharactersService {
   }
 }
 
+function toDateOnlyString(value: Date | null | undefined): string | null {
+  return value ? value.toISOString().slice(0, 10) : null;
+}
+
 function parseOptionalDate(value?: string): Date | null {
   if (!value) {
     return null;
@@ -652,4 +724,3 @@ function parseOptionalDate(value?: string): Date | null {
 
   return date;
 }
-

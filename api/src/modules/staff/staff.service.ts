@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AuthContextCacheService } from '../../common/auth-context/auth-context-cache.service';
 import { SAED_ORGANIZATION } from '../../common/constants/workplaces';
 import { hasAnyPermission } from '../../common/utils/permission.util';
 import { PrismaService } from '../../database/prisma.service';
@@ -82,6 +83,7 @@ export class StaffService {
     private readonly prismaService: PrismaService,
     private readonly rolesService: RolesService,
     private readonly auditService: AuditService,
+    private readonly authContextCacheService: AuthContextCacheService,
   ) {}
 
   findAll() {
@@ -337,6 +339,8 @@ export class StaffService {
         include: officerInclude,
       });
     });
+
+    this.authContextCacheService.invalidateCharacter(character.id);
 
     await this.auditService.create({
       actorAccountId: actor.accountId,

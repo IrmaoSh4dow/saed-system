@@ -18,6 +18,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { randomInt } from 'crypto';
+import { AuthContextCacheService } from '../../common/auth-context/auth-context-cache.service';
 import { SAED_ORGANIZATION } from '../../common/constants/workplaces';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
@@ -93,6 +94,7 @@ export class AcademyService {
     private readonly rolesService: RolesService,
     private readonly permissionsService: PermissionsService,
     private readonly applicationConfigurationsService: ApplicationConfigurationsService,
+    private readonly authContextCacheService: AuthContextCacheService,
   ) {}
 
   async getDashboard(characterId: string, permissions: string[]) {
@@ -975,6 +977,8 @@ export class AcademyService {
       return profile;
     });
 
+    this.authContextCacheService.invalidateCharacter(characterId);
+
     await this.auditService.create({
       actorAccountId: actor.accountId,
       actorCharacterId: actor.characterId,
@@ -1103,6 +1107,8 @@ export class AcademyService {
 
       return created;
     });
+
+    this.authContextCacheService.invalidateCharacter(characterId);
 
     await this.auditService.create({
       actorAccountId: actor.accountId,

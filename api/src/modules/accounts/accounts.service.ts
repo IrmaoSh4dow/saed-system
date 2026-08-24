@@ -16,8 +16,36 @@ export class AccountsService {
     });
   }
 
+  /**
+   * Lean account projection used by JWT validation on every request.
+   * Avoids loading identities / activeCharacter graphs for auth hot path.
+   */
+  findAuthAccountById(id: string) {
+    return this.prismaService.account.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        status: true,
+        activeCharacterId: true,
+      },
+    });
+  }
+
   async getByIdOrThrow(id: string) {
     const account = await this.findById(id);
+
+    if (!account) {
+      throw new NotFoundException('Account was not found');
+    }
+
+    return account;
+  }
+
+  async getAuthAccountByIdOrThrow(id: string) {
+    const account = await this.findAuthAccountById(id);
 
     if (!account) {
       throw new NotFoundException('Account was not found');
@@ -52,7 +80,7 @@ export class AccountsService {
     });
   }
 
-  assertAccountIsActive(account: Account): void {
+  assertAccountIsActive(account: Pick<Account, 'status'>): void {
     if (account.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Account is not active');
     }

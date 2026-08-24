@@ -5,6 +5,7 @@ import { isApiAuthEnabled } from '../utils/env.js';
 import { connectSocket, getSocket } from './socket-client.js';
 
 const LEGACY_NOTIFICATIONS_KEY = 'saed.notifications';
+const notificationsFetchedForCharacter = new Set();
 
 export async function listNotifications() {
   const characterId = getActiveCharacterId();
@@ -21,6 +22,7 @@ export async function listNotifications() {
         .map(normalizeNotification)
         .filter((item) => matchesActiveCharacter(item, characterId));
       saveLocal(characterId, items);
+      notificationsFetchedForCharacter.add(characterId);
       emit(APP_EVENTS.NOTIFICATIONS_UPDATED, items);
       return items;
     } catch {
@@ -93,6 +95,7 @@ export async function markAllNotificationsAsRead() {
  */
 export function resetNotificationsForActiveCharacter() {
   clearLegacyCache();
+  notificationsFetchedForCharacter.clear();
   emit(APP_EVENTS.NOTIFICATIONS_UPDATED, []);
   return listNotifications();
 }
@@ -125,7 +128,12 @@ export function bindNotificationSocket() {
   };
 
   socket.on('notifications:new', onNew);
-  void listNotifications();
+
+  // Fetch once per active character; SPA navigations must not hammer /notifications.
+  const characterId = getActiveCharacterId();
+  if (characterId && !notificationsFetchedForCharacter.has(characterId)) {
+    void listNotifications();
+  }
 
   return () => {
     socket.off('notifications:new', onNew);

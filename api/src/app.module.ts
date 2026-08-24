@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/config.module';
+import { AuthContextCacheModule } from './common/auth-context/auth-context-cache.module';
 import { StorageModule } from './common/storage/storage.module';
 import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
@@ -40,6 +41,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 @Module({
   imports: [
     AppConfigModule,
+    AuthContextCacheModule,
     StorageModule,
     PrismaModule,
     WebhooksModule,

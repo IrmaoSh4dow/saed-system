@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { SlowRequestInterceptor } from './common/interceptors/slow-request.interceptor';
 
 /**
  * Builds the Nest/Express request handler without calling listen().
@@ -21,9 +22,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
  * On Railway, `prisma migrate deploy` + seed run in the start command
  * before this process is launched (see api/railway.toml).
  */
-export async function attachNestToServer(
-  httpServer?: HttpServer,
-): Promise<RequestHandler> {
+export async function attachNestToServer(httpServer?: HttpServer): Promise<RequestHandler> {
   const logger = new Logger('NestBoot');
   const expressApp = express();
 
@@ -91,10 +90,10 @@ export async function attachNestToServer(
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(new SlowRequestInterceptor(), new ResponseInterceptor());
 
   await app.init();
   logger.log('Nest init complete');
 
-  return expressApp as unknown as RequestHandler;
+  return expressApp;
 }

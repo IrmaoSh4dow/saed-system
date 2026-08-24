@@ -11,6 +11,7 @@ import {
 } from './interfaces/i-auth-provider.interface';
 import { LocalAuthProvider } from './providers/local-auth.provider';
 import { ITokenPair, TokenService } from './token.service';
+import { AuthContextCacheService } from '../../common/auth-context/auth-context-cache.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +23,7 @@ export class AuthService {
     private readonly charactersService: CharactersService,
     private readonly tokenService: TokenService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly authContextCacheService: AuthContextCacheService,
   ) {
     this.providers = new Map<AuthProvider, IAuthProvider>([
       [AuthProvider.LOCAL, this.localAuthProvider],
@@ -81,7 +83,11 @@ export class AuthService {
   }
 
   async logout(refreshToken: string): Promise<void> {
+    const stored = await this.tokenService.findValidRefreshToken(refreshToken);
     await this.tokenService.revokeRefreshToken(refreshToken);
+    if (stored?.accountId) {
+      this.authContextCacheService.invalidateAccount(stored.accountId);
+    }
   }
 
   async getMe(accountId: string) {
@@ -110,6 +116,7 @@ export class AuthService {
   async selectCharacter(accountId: string, characterId: string) {
     const character = await this.charactersService.buildAuthContext(characterId, accountId);
     await this.accountsService.setActiveCharacter(accountId, characterId);
+    this.authContextCacheService.invalidateAccount(accountId);
 
     const access = await this.tokenService.issueAccessToken({
       accountId,
@@ -179,6 +186,7 @@ export class AuthService {
   ) {
     const account = await this.accountsService.getByIdOrThrow(accountId);
     this.accountsService.assertAccountIsActive(account);
+    this.authContextCacheService.invalidateAccount(accountId);
 
     const character = account.activeCharacterId
       ? await this.charactersService.buildAuthContext(account.activeCharacterId, account.id)

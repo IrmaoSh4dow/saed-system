@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AuthContextCacheService } from '../../common/auth-context/auth-context-cache.service';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -11,6 +12,7 @@ export class RolesService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
+    private readonly authContextCacheService: AuthContextCacheService,
   ) {}
 
   findAll() {
@@ -103,6 +105,8 @@ export class RolesService {
         })),
       });
     });
+
+    this.authContextCacheService.invalidateCharacter(characterId);
 
     await this.auditService.create({
       actorAccountId: actor.accountId,

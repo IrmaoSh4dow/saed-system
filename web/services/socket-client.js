@@ -17,18 +17,24 @@ export function getSocket() {
     return socketInstance;
   }
 
-  // Prefer a single websocket transport to avoid polling→websocket upgrade
-  // cycles that look like disconnect/reconnect on every page load.
+  // Websocket first; keep polling as fallback for Railway proxies that drop WS.
+  // rememberUpgrade avoids repeated polling→websocket upgrade churn.
   socketInstance = io(getSocketUrl(), {
     autoConnect: false,
     withCredentials: true,
-    transports: ['websocket'],
-    upgrade: false,
+    transports: ['websocket', 'polling'],
+    rememberUpgrade: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1_000,
     reconnectionDelayMax: 10_000,
     timeout: 20_000,
+  });
+
+  // The access token rotates every ~15 min. Without re-reading it here a reconnect
+  // would replay the expired token, get rejected by the gateway and loop forever.
+  socketInstance.io.on('reconnect_attempt', () => {
+    applyAuth(socketInstance);
   });
 
   return socketInstance;
@@ -38,7 +44,7 @@ export function connectSocket() {
   const socket = getSocket();
   applyAuth(socket);
 
-  if (!socket.connected) {
+  if (!socket.connected && !socket.active) {
     socket.connect();
   }
 
@@ -57,7 +63,9 @@ export function reconnectSocketWithAuth() {
   const nextToken = typeof socket.auth?.token === 'string' ? socket.auth.token : null;
 
   if (!socket.connected) {
-    socket.connect();
+    if (!socket.active) {
+      socket.connect();
+    }
     return socket;
   }
 

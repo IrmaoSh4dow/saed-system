@@ -10,7 +10,6 @@ import {
   setIdentitySource,
 } from './auth-state.store.js';
 import * as charactersApi from './characters.service.js';
-import { fetchActivePermissions } from './permissions.service.js';
 import {
   addCharacter as addLocalCharacter,
   clearAppSession,
@@ -53,20 +52,16 @@ export async function bootstrapSession() {
   }
 
   try {
-    const me = await authApi.fetchMe();
-    applyAuthSessionPayload(me);
-    const characters = await charactersApi.listCharacters();
-    setIdentityCharacters(characters);
+    // /auth/me already carries permissions and roles for the active character,
+    // so the boot path is two parallel requests instead of three sequential ones.
+    const [me, characters] = await Promise.all([
+      authApi.fetchMe(),
+      charactersApi.listCharacters(),
+    ]);
 
-    if (me.character?.id) {
-      const permissionsPayload = await fetchActivePermissions().catch(() => null);
-      if (permissionsPayload) {
-        setIdentityPermissions(
-          permissionsPayload.permissions ?? me.permissions ?? [],
-          permissionsPayload.roles ?? me.roles ?? [],
-        );
-      }
-    }
+    applyAuthSessionPayload(me);
+    setIdentityCharacters(characters);
+    setIdentityPermissions(me.permissions ?? [], me.roles ?? []);
 
     setIdentityHydrated(true);
     return getIdentityState();
@@ -169,16 +164,7 @@ export async function switchActiveCharacter(characterId) {
   if (isUsingApiAuth() || (isApiAuthEnabled() && authApi.hasApiSession())) {
     const session = await authApi.selectCharacter(characterId);
     applyAuthSessionPayload(session);
-
-    const permissionsPayload = await fetchActivePermissions().catch(() => ({
-      permissions: session.permissions ?? [],
-      roles: session.roles ?? [],
-    }));
-
-    setIdentityPermissions(
-      permissionsPayload.permissions ?? session.permissions ?? [],
-      permissionsPayload.roles ?? session.roles ?? [],
-    );
+    setIdentityPermissions(session.permissions ?? [], session.roles ?? []);
 
     const characters = await charactersApi.listCharacters();
     setIdentityCharacters(characters);

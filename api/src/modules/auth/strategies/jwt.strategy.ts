@@ -4,6 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AccountsService } from '../../accounts/accounts.service';
 import { CharactersService } from '../../characters/characters.service';
+import { AuthContextCacheService } from '../../../common/auth-context/auth-context-cache.service';
 import { IAuthRequestUser } from '../interfaces/i-auth-request.interface';
 import { IJwtPayload } from '../interfaces/i-jwt-payload.interface';
 
@@ -13,6 +14,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     configService: ConfigService,
     private readonly accountsService: AccountsService,
     private readonly charactersService: CharactersService,
+    private readonly authContextCacheService: AuthContextCacheService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -26,26 +28,32 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    const account = await this.accountsService.getByIdOrThrow(payload.sub);
+    const cached = this.authContextCacheService.get(payload.sub, payload.characterId);
+    if (cached) {
+      return cached;
+    }
+
+    const account = await this.accountsService.getAuthAccountByIdOrThrow(payload.sub);
     this.accountsService.assertAccountIsActive(account);
 
     const character = payload.characterId
-      ? await this.charactersService.buildAuthContext(payload.characterId, account.id)
+      ? await this.charactersService.buildRequestAuthContext(payload.characterId, account.id)
       : null;
 
-    const authAccount = {
-      id: account.id,
-      email: account.email,
-      username: account.username,
-      displayName: account.displayName,
-      status: account.status,
-      activeCharacterId: account.activeCharacterId,
-    };
-
-    return {
-      account: authAccount,
+    const authUser: IAuthRequestUser = {
+      account: {
+        id: account.id,
+        email: account.email,
+        username: account.username,
+        displayName: account.displayName,
+        status: account.status,
+        activeCharacterId: account.activeCharacterId,
+      },
       character,
       permissions: character?.permissions ?? [],
     };
+
+    this.authContextCacheService.set(payload.sub, payload.characterId, authUser);
+    return authUser;
   }
 }
