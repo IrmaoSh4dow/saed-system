@@ -826,41 +826,29 @@ async function pruneOperationalData(): Promise<void> {
 }
 
 const DEFAULT_TREATMENTS = [
-  { name: 'Tratamiento básico - Sin seguro', price: 350, sortOrder: 10 },
+  { name: 'Tratamiento básico', price: 350, sortOrder: 10 },
 
-{ name: 'Tratamiento básico - Con seguro', price: 240, sortOrder: 20 },
+{ name: 'Tratamiento intermedio', price: 750, sortOrder: 20 },
 
-{ name: 'Tratamiento intermedio - Sin seguro', price: 750, sortOrder: 30 },
+{ name: 'Tratamiento avanzado', price: 1450, sortOrder: 30 },
 
-{ name: 'Tratamiento intermedio - Con seguro', price: 520, sortOrder: 40 },
+{ name: 'Asistencia en ciudad', price: 180, sortOrder: 40 },
 
-{ name: 'Tratamiento avanzado - Sin seguro', price: 1450, sortOrder: 50 },
+{ name: 'Asistencia fuera de ciudad', price: 450, sortOrder: 50 },
 
-{ name: 'Tratamiento avanzado - Con seguro', price: 990, sortOrder: 60 },
+{ name: 'Estudio médico básico', price: 100, sortOrder: 60 },
 
-{ name: 'Asistencia en ciudad - Sin seguro', price: 180, sortOrder: 70 },
+{ name: 'Estudio médico avanzado', price: 300, sortOrder: 70 },
 
-{ name: 'Asistencia fuera de ciudad', price: 450, sortOrder: 80 },
+{ name: 'Consulta de psicología', price: 300, sortOrder: 80 },
 
-{ name: 'Estudio médico básico - Sin seguro', price: 100, sortOrder: 90 },
+{ name: 'Psicotécnico licencia de armas', price: 2500, sortOrder: 90 },
 
-{ name: 'Estudio médico básico - Con seguro', price: 70, sortOrder: 100 },
+{ name: 'Psicotécnico LSPD', price: 2500, sortOrder: 100 },
 
-{ name: 'Estudio médico avanzado - Sin seguro', price: 300, sortOrder: 110 },
+{ name: 'Servicio pre y postmortem', price: 1400, sortOrder: 110 },
 
-{ name: 'Estudio médico avanzado - Con seguro', price: 200, sortOrder: 120 },
-
-{ name: 'Consulta de psicología - Sin seguro', price: 300, sortOrder: 130 },
-
-{ name: 'Consulta de psicología - Con seguro', price: 200, sortOrder: 140 },
-
-{ name: 'Psicotécnico licencia de armas', price: 2500, sortOrder: 150 },
-
-{ name: 'Psicotécnico LSPD', price: 2500, sortOrder: 160 },
-
-{ name: 'Servicio pre y postmortem', price: 1400, sortOrder: 170 },
-
-{ name: 'Venda médica', price: 75, sortOrder: 180 },
+{ name: 'Venda médica', price: 75, sortOrder: 120 },
 ] as const;
 
 async function seedTreatments(): Promise<void> {
