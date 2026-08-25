@@ -832,7 +832,7 @@ const DEFAULT_TREATMENTS = [
   { name: 'Analítica de sangre', price: 200, sortOrder: 40 },
   { name: 'Ecografía', price: 350, sortOrder: 50 },
   { name: 'Psicotécnico civil', price: 400, sortOrder: 60 },
-  { name: 'Psicotécnico LSPD', price: 500, sortOrder: 70 },
+  { name: 'Psicotécnico LSPD', price: 2500, sortOrder: 70 },
   { name: 'Hospitalización (día)', price: 800, sortOrder: 80 },
   { name: 'Cirugía menor', price: 1500, sortOrder: 90 },
   { name: 'Tratamiento de urgencias', price: 600, sortOrder: 100 },
