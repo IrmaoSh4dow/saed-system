@@ -1,4 +1,5 @@
 import { renderAuthAlert, setAuthAlert } from '../../components/auth/auth-alert.js';
+import { findPartnerBySupervisorRole } from '../../config/institutional-partners.js';
 import { renderStaffDecorationsGrid } from '../../components/staff/staff-decorations-grid.js';
 import { renderStaffDepartmentPanel } from '../../components/staff/staff-department-panel.js';
 import { renderStaffDepartmentsSection } from '../../components/staff/staff-departments-section.js';
@@ -403,7 +404,7 @@ function renderCharacterDetail(
           <section class="panel p-6">
             <h3 class="text-sm font-semibold text-white">Cambio manual de empleo</h3>
             <p class="mt-1 text-xs text-ink-400">
-              Corrección administrativa. No crea solicitud. Al salir del LSPD se limpia la placa del paciente vinculado.
+              Corrección administrativa. No crea solicitud. Al salir de una agencia institucional se limpia la placa del paciente vinculado.
             </p>
             <form id="admin-employment-form" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
               <div>
@@ -442,8 +443,9 @@ function renderCharacterDetail(
         <div>
           <h3 class="text-sm font-semibold text-white">Roles RBAC</h3>
           <p class="mt-1 text-xs text-ink-400">
-            Los roles definen permisos del sistema. Para acceso LSPD asigna
-            <span class="text-brand-300">LSPD Medical Supervisor</span>.
+            Los roles definen permisos del sistema. Para acceso institucional asigna
+            <span class="text-brand-300">LSPD Medical Supervisor</span> o
+            <span class="text-brand-300">LSCSO Medical Supervisor</span>.
             No requiere promover a personal SAED.
           </p>
         </div>
@@ -461,10 +463,10 @@ function renderCharacterDetail(
               ? rolesCatalog
                   .map((role) => {
                     const checked = assignedRoleSlugs.includes(role.slug);
-                    const isLspd = role.slug === 'lspd-medical-supervisor';
+                    const partner = findPartnerBySupervisorRole(role.slug);
                     return `
                       <label class="flex items-start gap-3 rounded-2xl border px-3.5 py-3 text-sm transition ${
-                        isLspd
+                        partner
                           ? 'border-brand-400/30 bg-brand-500/5'
                           : 'border-white/10 bg-white/[0.02]'
                       }">
@@ -480,8 +482,10 @@ function renderCharacterDetail(
                           <span class="block font-medium text-white">${escapeHtml(role.name)}</span>
                           <span class="mt-0.5 block text-xs text-ink-500">${escapeHtml(role.slug)}</span>
                           ${
-                            isLspd
-                              ? `<span class="mt-1 block text-xs text-brand-200">Directorio LSPD, aptitud y solicitudes de expediente.</span>`
+                            partner
+                              ? `<span class="mt-1 block text-xs text-brand-200">Directorio ${escapeHtml(
+                                  partner.label,
+                                )}, aptitud y solicitudes de expediente.</span>`
                               : ''
                           }
                         </span>

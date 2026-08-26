@@ -14,8 +14,15 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import {
+  canAccessPartner,
+  findPartnerByOccupation,
+  findPartnerByOrganization,
+  getInstitutionalPartner,
+  INSTITUTIONAL_PARTNERS,
+  type InstitutionalPartnerKey,
+} from '../../common/constants/institutional-partners';
 import { TEMPORARY_ACCESS_CONFIG } from '../../common/temporary-access/temporary-access.config';
-import { INSTITUTIONAL_PARTNERS } from './occupational-health.constants';
 
 const ACCESS_DURATION_MS = TEMPORARY_ACCESS_CONFIG.MEDICAL_RECORD_DURATION_MS;
 
@@ -87,8 +94,19 @@ export class MedicalRecordAccessService {
 
   async create(
     input: { patientId: string; reason: string },
-    actor: { accountId: string; characterId: string },
+    actor: {
+      accountId: string;
+      characterId: string;
+      roles?: string[];
+      permissions?: string[];
+    },
+    partnerKey: InstitutionalPartnerKey,
   ) {
+    const partner = getInstitutionalPartner(partnerKey);
+    if (!canAccessPartner(partnerKey, actor)) {
+      throw new ForbiddenException(`You cannot operate on ${partner.name} records`);
+    }
+
     const reason = input.reason?.trim();
     if (!reason || reason.length < 8) {
       throw new BadRequestException('reason must be at least 8 characters');
@@ -119,16 +137,9 @@ export class MedicalRecordAccessService {
     }
 
     const occupation = patient.linkedCharacter?.occupations?.[0];
-    const partner = INSTITUTIONAL_PARTNERS.LSPD;
-    const isLspd =
-      occupation?.establishment?.slug === partner.slug ||
-      partner.aliases.some(
-        (alias) =>
-          (occupation?.organization ?? '').toLowerCase() === alias.toLowerCase(),
-      );
-    if (!isLspd) {
+    if (findPartnerByOccupation(occupation)?.key !== partnerKey) {
       throw new BadRequestException(
-        'Medical record access can only be requested for LSPD-linked patients',
+        `Medical record access can only be requested for ${partner.name}-linked patients`,
       );
     }
 
@@ -152,7 +163,7 @@ export class MedicalRecordAccessService {
       data: {
         patientId: patient.id,
         requesterCharacterId: actor.characterId,
-        requesterOrganization: occupation?.establishment?.name ?? occupation?.organization ?? partner.name,
+        requesterOrganization: partner.name,
         reason,
         status: MedicalRecordAccessStatus.PENDING,
       },
@@ -184,15 +195,29 @@ export class MedicalRecordAccessService {
   }
 
   async list(
-    actor: { characterId: string; permissions: string[] },
+    actor: { characterId: string; permissions: string[]; roles?: string[] },
     query: { status?: MedicalRecordAccessStatus; q?: string } = {},
+    partnerKey?: InstitutionalPartnerKey,
   ) {
     await this.expireStaleGrants();
     const canReview = await this.canReview(actor.characterId, actor.permissions);
 
+    if (partnerKey && !canAccessPartner(partnerKey, actor)) {
+      throw new ForbiddenException(
+        `You cannot operate on ${getInstitutionalPartner(partnerKey).name} records`,
+      );
+    }
+
     const where: Prisma.MedicalRecordAccessRequestWhereInput = canReview
       ? {}
       : { requesterCharacterId: actor.characterId };
+
+    if (partnerKey) {
+      where.requesterOrganization = {
+        in: [...getInstitutionalPartner(partnerKey).aliases],
+        mode: 'insensitive',
+      };
+    }
 
     if (query.status) {
       where.status = query.status;
@@ -226,12 +251,13 @@ export class MedicalRecordAccessService {
     id: string,
     actor: { accountId: string; characterId: string; permissions: string[] },
     decisionNotes?: string,
+    partnerKey?: InstitutionalPartnerKey,
   ) {
     if (!(await this.canReview(actor.characterId, actor.permissions))) {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    const existing = await this.requireRequest(id);
+    const existing = await this.requireRequest(id, partnerKey);
     if (existing.status !== MedicalRecordAccessStatus.PENDING) {
       throw new BadRequestException('Only pending requests can be approved');
     }
@@ -279,12 +305,13 @@ export class MedicalRecordAccessService {
     id: string,
     actor: { accountId: string; characterId: string; permissions: string[] },
     decisionNotes?: string,
+    partnerKey?: InstitutionalPartnerKey,
   ) {
     if (!(await this.canReview(actor.characterId, actor.permissions))) {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    const existing = await this.requireRequest(id);
+    const existing = await this.requireRequest(id, partnerKey);
     if (existing.status !== MedicalRecordAccessStatus.PENDING) {
       throw new BadRequestException('Only pending requests can be rejected');
     }
@@ -326,12 +353,13 @@ export class MedicalRecordAccessService {
   async revoke(
     id: string,
     actor: { accountId: string; characterId: string; permissions: string[] },
+    partnerKey?: InstitutionalPartnerKey,
   ) {
     if (!(await this.canReview(actor.characterId, actor.permissions))) {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    const existing = await this.requireRequest(id);
+    const existing = await this.requireRequest(id, partnerKey);
     if (existing.status !== MedicalRecordAccessStatus.APPROVED) {
       throw new BadRequestException('Only approved grants can be revoked');
     }
@@ -364,14 +392,25 @@ export class MedicalRecordAccessService {
     return this.toDto(updated);
   }
 
-  private async requireRequest(id: string) {
+  private async requireRequest(id: string, partnerKey?: InstitutionalPartnerKey) {
     const row = await this.prismaService.medicalRecordAccessRequest.findUnique({
       where: { id },
     });
     if (!row) {
       throw new NotFoundException('Access request was not found');
     }
+    if (partnerKey && findPartnerByOrganization(row.requesterOrganization)?.key !== partnerKey) {
+      throw new NotFoundException('Access request was not found');
+    }
     return row;
+  }
+
+  /** Route a notification to the module of the agency that owns the request. */
+  private resolveRoutePath(organization: string): string {
+    return (
+      findPartnerByOrganization(organization)?.routePath ??
+      INSTITUTIONAL_PARTNERS.LSPD.routePath
+    );
   }
 
   private async findHighCommand() {
@@ -406,7 +445,7 @@ export class MedicalRecordAccessService {
         type: NotificationType.MEDICAL_RECORD_ACCESS_CREATED,
         title,
         body,
-        href: '/lspd?tab=access',
+        href: `${this.resolveRoutePath(request.requesterOrganization)}?tab=access`,
         metadata: {
           accessRequestId: request.id,
           requestNumber: request.requestNumber,
@@ -438,7 +477,7 @@ export class MedicalRecordAccessService {
       type: NotificationType.MEDICAL_RECORD_ACCESS_STATUS,
       title,
       body,
-      href: `/lspd?patient=${request.patientId}`,
+      href: `${this.resolveRoutePath(request.requesterOrganization)}?patient=${request.patientId}`,
       metadata: {
         accessRequestId: request.id,
         status: request.status,

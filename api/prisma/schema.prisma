@@ -95,6 +95,7 @@ enum AppointmentType {
   MEDICAL
   PSYCHOTECHNICAL_CIVIL
   PSYCHOTECHNICAL_LSPD
+  PSYCHOTECHNICAL_LSCSO
 }
 
 enum AppointmentStatus {
@@ -923,7 +924,7 @@ model Patient {
   /// Workplace / organization belonging to this clinical record (independent of Character).
   establishmentId       String?
   establishment         Establishment? @relation(fields: [establishmentId], references: [id], onDelete: SetNull)
-  /// Institutional badge/placa — only meaningful for LSPD patients; cleared when leaving LSPD.
+  /// Institutional badge/placa — only for institutional partners (LSPD, LSCSO); cleared when leaving them.
   badgeNumber           String?
   /// Optional link to a playable Character. Never required.
   linkedCharacterId     String?        @unique

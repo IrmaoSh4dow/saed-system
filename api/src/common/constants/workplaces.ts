@@ -1,10 +1,15 @@
 import { OccupationType } from '@prisma/client';
+import {
+  INSTITUTIONAL_PARTNERS,
+  listInstitutionalPartners,
+} from './institutional-partners';
 
 export const SAED_ORGANIZATION = 'SAED';
 
-/** Institutional partner slug used for LSPD occupational-health interoperability. */
-export const LSPD_ESTABLISHMENT_SLUG = 'lspd';
-export const LSPD_ORGANIZATION = 'LSPD';
+/** @deprecated Use INSTITUTIONAL_PARTNERS from './institutional-partners'. */
+export const LSPD_ESTABLISHMENT_SLUG = INSTITUTIONAL_PARTNERS.LSPD.slug;
+/** @deprecated Use INSTITUTIONAL_PARTNERS from './institutional-partners'. */
+export const LSPD_ORGANIZATION = INSTITUTIONAL_PARTNERS.LSPD.name;
 
 export interface IEstablishmentSeed {
   slug: string;
@@ -16,19 +21,17 @@ export interface IEstablishmentSeed {
   isSelectable?: boolean;
 }
 
-/**
- * Default civilian establishments seeded into the Establishment catalog.
- * Runtime validation must use the database — never hardcode this list in services.
- */
-export const DEFAULT_ESTABLISHMENT_SEED: readonly IEstablishmentSeed[] = [
-  {
-    slug: LSPD_ESTABLISHMENT_SLUG,
-    name: LSPD_ORGANIZATION,
+const INSTITUTIONAL_PARTNER_SEED: readonly IEstablishmentSeed[] =
+  listInstitutionalPartners().map((partner) => ({
+    slug: partner.slug,
+    name: partner.name,
     type: OccupationType.DEPARTMENT,
-    defaultPosition: 'Officer',
-    sortOrder: 5,
+    defaultPosition: partner.defaultPosition,
+    sortOrder: partner.sortOrder,
     isSelectable: true,
-  },
+  }));
+
+const CIVILIAN_ESTABLISHMENT_SEED: readonly IEstablishmentSeed[] = [
   {
     slug: 'uwu-cafe',
     name: 'UwU Cafe',
@@ -72,6 +75,15 @@ export const DEFAULT_ESTABLISHMENT_SEED: readonly IEstablishmentSeed[] = [
     sortOrder: 999,
   },
 ] as const;
+
+/**
+ * Default establishments seeded into the Establishment catalog.
+ * Runtime validation must use the database — never hardcode this list in services.
+ */
+export const DEFAULT_ESTABLISHMENT_SEED: readonly IEstablishmentSeed[] = [
+  ...INSTITUTIONAL_PARTNER_SEED,
+  ...CIVILIAN_ESTABLISHMENT_SEED,
+];
 
 export function isSaedOrganization(organization: string): boolean {
   return organization.trim().toLowerCase() === SAED_ORGANIZATION.toLowerCase();

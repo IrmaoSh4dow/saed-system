@@ -9,6 +9,4 @@ export const TEMPORARY_ACCESS_CONFIG = {
   EXPIRY_WARNING_MS: 60 * 60 * 1000,
   /** Optional override ceiling when callers pass a custom durationHours. */
   MAX_DURATION_HOURS: 168,
-  DEFAULT_ORGANIZATION: 'LSPD',
-  RECIPIENT_ROLE_SLUG: 'lspd-medical-supervisor',
 } as const;

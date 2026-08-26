@@ -1,6 +1,29 @@
 import { icon } from '../components/landing/icons.js';
 import { canSubmitAcademyApplication } from '../utils/character.js';
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '../utils/permissions.js';
+import {
+  canAccessPartnerModule,
+  INSTITUTIONAL_PARTNERS,
+} from './institutional-partners.js';
+
+/**
+ * One sidebar entry per institutional partner. High Command sees them all; an
+ * external supervisor only sees the agency of its role.
+ */
+const INSTITUTIONAL_PARTNER_NAVIGATION = INSTITUTIONAL_PARTNERS.map((partner) => ({
+  name: partner.label,
+  path: partner.routePath,
+  permission: PERMISSIONS.OCCUPATIONAL_HEALTH_INTEROP,
+  anyPermissions: [
+    PERMISSIONS.OCCUPATIONAL_HEALTH_READ,
+    PERMISSIONS.OCCUPATIONAL_HEALTH_INTEROP,
+    partner.financePermission,
+    PERMISSIONS.MEDICAL_RECORD_ACCESS_READ,
+    PERMISSIONS.MEDICAL_REPORT_ACCESS_READ,
+  ],
+  requirePartnerAccess: partner.key,
+  icon: 'shield',
+}));
 
 export const SIDEBAR_NAVIGATION = [
   {
@@ -53,20 +76,7 @@ export const SIDEBAR_NAVIGATION = [
     permission: PERMISSIONS.AGREEMENTS_READ,
     icon: 'archive',
   },
-  {
-    name: 'LSPD',
-    path: '/lspd',
-    // High Command (occupational-health.read / finance / review) + LSPD Medical Supervisor (interop)
-    permission: PERMISSIONS.OCCUPATIONAL_HEALTH_INTEROP,
-    anyPermissions: [
-      PERMISSIONS.OCCUPATIONAL_HEALTH_READ,
-      PERMISSIONS.OCCUPATIONAL_HEALTH_INTEROP,
-      PERMISSIONS.LSPD_FINANCE_READ,
-      PERMISSIONS.MEDICAL_RECORD_ACCESS_READ,
-      PERMISSIONS.MEDICAL_REPORT_ACCESS_READ,
-    ],
-    icon: 'shield',
-  },
+  ...INSTITUTIONAL_PARTNER_NAVIGATION,
   {
     name: 'Pacientes',
     path: '/patients',
@@ -308,6 +318,12 @@ export const ADMIN_NAVIGATION = [
 export function getVisibleNavigation(grantedPermissions, activeCharacter = null) {
   return SIDEBAR_NAVIGATION.filter((item) => {
     if (item.requireCivilianApplicant && !canSubmitAcademyApplication(activeCharacter)) {
+      return false;
+    }
+    if (
+      item.requirePartnerAccess &&
+      !canAccessPartnerModule(item.requirePartnerAccess, grantedPermissions, activeCharacter)
+    ) {
       return false;
     }
     if (item.anyPermissions?.length) {

@@ -29,7 +29,7 @@ export class SearchMedicalRecordAccessDto {
   q?: string;
 }
 
-export class LspdFinanceQueryDto {
+export class InstitutionalFinanceQueryDto {
   @IsOptional()
   @IsString()
   partner?: string;

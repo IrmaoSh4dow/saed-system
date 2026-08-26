@@ -42,8 +42,8 @@ export class MedicalReportAccessController {
 
   @Get('recipients')
   @Permissions('medical-report-access.grant')
-  listRecipients() {
-    return this.medicalReportAccessService.listRecipients();
+  listRecipients(@Query('partner') partner?: string) {
+    return this.medicalReportAccessService.listRecipients(partner);
   }
 
   @Get('grants')

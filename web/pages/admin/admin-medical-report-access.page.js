@@ -83,10 +83,10 @@ export function adminMedicalReportAccessPage() {
 
           host.innerHTML = `
             <section class="space-y-2">
-              <p class="landing-eyebrow">Interoperabilidad SAED ↔ LSPD</p>
+              <p class="landing-eyebrow">Interoperabilidad institucional</p>
               <h2 class="text-2xl font-semibold text-white">Acceso temporal a informes médicos</h2>
               <p class="max-w-3xl text-sm text-ink-400">
-                Trazabilidad completa de autorizaciones concedidas a Supervisores del LSPD.
+                Trazabilidad completa de autorizaciones concedidas a Supervisores institucionales.
                 Duración por defecto: ${dashboard.defaultDurationHours}h.
               </p>
             </section>

@@ -1,4 +1,4 @@
 import { getInstitutionalPartner } from '../config/institutional-partners.js';
 import { createInstitutionalPartnerPage } from './institutional-partner.page.js';
 
-export const lspdPage = createInstitutionalPartnerPage(getInstitutionalPartner('LSPD'));
+export const lscsoPage = createInstitutionalPartnerPage(getInstitutionalPartner('LSCSO'));

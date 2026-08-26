@@ -19,7 +19,7 @@ export class OccupationsService {
 
   async createForCharacter(characterId: string, dto: CreateOccupationDto) {
     await this.assertCharacterExists(characterId);
-    this.assertNotManualLspd(dto.organization);
+    this.assertNotManualSaed(dto.organization);
 
     return this.prismaService.$transaction(async (tx) => {
       if (dto.isPrimary) {
@@ -52,7 +52,7 @@ export class OccupationsService {
     }
 
     if (dto.organization !== undefined) {
-      this.assertNotManualLspd(dto.organization);
+      this.assertNotManualSaed(dto.organization);
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -97,7 +97,7 @@ export class OccupationsService {
     return { deleted: true, id: occupationId };
   }
 
-  private assertNotManualLspd(organization: string) {
+  private assertNotManualSaed(organization: string) {
     if (isSaedOrganization(organization)) {
       throw new BadRequestException(
         `${SAED_ORGANIZATION} can only be assigned through officer promotion.`,

@@ -187,9 +187,10 @@ const PERMISSIONS = [
   { key: 'medical-leaves.create', description: 'Register medical leaves' },
   { key: 'medical-leaves.update', description: 'Update medical leaves' },
   { key: 'medical-leaves.manage', description: 'Manage medical leaves' },
-  { key: 'occupational-health.read', description: 'View LSPD occupational fitness dashboard (High Command)' },
-  { key: 'occupational-health.interop', description: 'LSPD interop directory (redacted fitness data)' },
+  { key: 'occupational-health.read', description: 'View institutional occupational fitness dashboard (High Command)' },
+  { key: 'occupational-health.interop', description: 'Institutional interop directory (redacted fitness data)' },
   { key: 'lspd.finance.read', description: 'View LSPD institutional billing summary' },
+  { key: 'lscso.finance.read', description: 'View LSCSO institutional billing summary' },
   { key: 'institutional-payments.read', description: 'View institutional payments ledger and balances' },
   { key: 'institutional-payments.create', description: 'Register institutional payments' },
   { key: 'institutional-payments.update', description: 'Update institutional payments' },
@@ -341,6 +342,7 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'psychotechnical-evaluations.manage',
   'medical-leaves.manage',
   'lspd.finance.read',
+  'lscso.finance.read',
   'institutional-payments.read',
   'institutional-payments.create',
   'institutional-payments.update',
@@ -376,8 +378,12 @@ const MEDICAL_DIRECTOR_BASE = [
   'gallery.manage',
 ] as const;
 
-/** External agency interop — redacted occupational fitness only (no clinical chart). */
-const LSPD_MEDICAL_SUPERVISOR_PERMISSIONS = [
+/**
+ * External agency interop — redacted occupational fitness only (no clinical chart).
+ * Shared by every institutional partner; the agency a supervisor can reach is
+ * decided by its role slug, not by extra permissions.
+ */
+const INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS = [
   'auth.session',
   'dashboard.read',
   'profile.read',
@@ -456,7 +462,14 @@ const ROLES = [
     slug: 'lspd-medical-supervisor',
     description:
       'External LSPD interoperability role — occupational fitness only (no clinical chart access)',
-    permissions: [...LSPD_MEDICAL_SUPERVISOR_PERMISSIONS],
+    permissions: [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS],
+  },
+  {
+    name: 'LSCSO Medical Supervisor',
+    slug: 'lscso-medical-supervisor',
+    description:
+      'External LSCSO interoperability role — occupational fitness only (no clinical chart access)',
+    permissions: [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS],
   },
 ] as const;
 
@@ -845,6 +858,8 @@ const DEFAULT_TREATMENTS = [
 { name: 'Psicotécnico licencia de armas', price: 2500, sortOrder: 90 },
 
 { name: 'Psicotécnico LSPD', price: 2500, sortOrder: 100 },
+
+{ name: 'Psicotécnico LSCSO', price: 2500, sortOrder: 105 },
 
 { name: 'Servicio pre y postmortem', price: 1400, sortOrder: 110 },
 

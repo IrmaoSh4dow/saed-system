@@ -14,8 +14,8 @@ export async function listMedicalReportAccessReasons() {
   return unwrap(response);
 }
 
-export async function listMedicalReportAccessRecipients() {
-  const response = await apiClient.get('/medical-report-access/recipients');
+export async function listMedicalReportAccessRecipients(params = {}) {
+  const response = await apiClient.get('/medical-report-access/recipients', { params });
   return unwrap(response);
 }
 
@@ -36,16 +36,6 @@ export async function grantMedicalReportAccess(payload) {
 
 export async function revokeMedicalReportAccess(grantId) {
   const response = await apiClient.post(`/medical-report-access/grants/${grantId}/revoke`);
-  return unwrap(response);
-}
-
-export async function listAuthorizedMedicalReports() {
-  const response = await apiClient.get('/lspd/authorized-reports');
-  return unwrap(response);
-}
-
-export async function getAuthorizedMedicalReport(grantId) {
-  const response = await apiClient.get(`/lspd/authorized-reports/${grantId}`);
   return unwrap(response);
 }
 

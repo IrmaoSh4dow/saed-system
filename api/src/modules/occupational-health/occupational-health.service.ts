@@ -2,10 +2,13 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { MedicalLeaveStatus, Prisma, PsychotechnicalResult } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
-  INSTITUTIONAL_PARTNERS,
-  PSYCHOTECHNICAL_EXPIRING_SOON_DAYS,
+  getInstitutionalPartner,
+  listInstitutionalPartners,
+  resolveInstitutionalPartnerKey,
+  type IInstitutionalPartner,
   type InstitutionalPartnerKey,
-} from './occupational-health.constants';
+} from '../../common/constants/institutional-partners';
+import { PSYCHOTECHNICAL_EXPIRING_SOON_DAYS } from './occupational-health.constants';
 import { MedicalLeavesService } from './medical-leaves.service';
 import { PsychotechnicalEvaluationsService } from './psychotechnical-evaluations.service';
 import {
@@ -174,21 +177,27 @@ export class OccupationalHealthService {
   }
 
   /**
-   * Redacted roster for external agency interop (LSPD Medical Supervisor).
+   * Redacted roster for external agency interop (institutional Medical Supervisor).
    * Never exposes diagnoses, reports, hospitalizations or clinical notes.
    */
   async listInteropRoster(query: SearchOccupationalHealthDto = {}) {
-    const partnerKey = this.resolvePartnerKey(query.partner);
-    const partner = INSTITUTIONAL_PARTNERS[partnerKey];
+    const partnerKey = resolveInstitutionalPartnerKey(query.partner);
+    // Without an explicit agency the roster covers every partner, which is what
+    // SAED oversight needs; an agency supervisor always sends its own key.
+    const partners = partnerKey
+      ? [getInstitutionalPartner(partnerKey)]
+      : listInstitutionalPartners();
+    const slugs = partners.map((item) => item.slug);
+    const aliases = partners.flatMap((item) => [...item.aliases]);
     const term = query.q?.trim() ?? '';
 
     const occupationFilter: Prisma.OccupationWhereInput = {
       isActive: true,
       OR: [
-        { establishment: { slug: partner.slug } },
+        { establishment: { slug: { in: slugs } } },
         {
           organization: {
-            in: [...partner.aliases],
+            in: aliases,
             mode: 'insensitive',
           },
         },
@@ -201,10 +210,7 @@ export class OccupationalHealthService {
         OR: [
           {
             establishment: {
-              OR: [
-                { slug: partner.slug },
-                { name: { in: [...partner.aliases], mode: 'insensitive' } },
-              ],
+              OR: [{ slug: { in: slugs } }, { name: { in: aliases, mode: 'insensitive' } }],
             },
           },
           {
@@ -314,7 +320,7 @@ export class OccupationalHealthService {
             patient.establishment?.name ??
             occupation?.establishment?.name ??
             occupation?.organization ??
-            partner.name,
+            (partners.length === 1 ? partners[0].name : null),
           position: occupation?.position ?? null,
           psychotechnical: evaluation
             ? {
@@ -325,7 +331,7 @@ export class OccupationalHealthService {
                 hasPsychotechnical: true,
                 isExpired: validity === 'EXPIRED',
                 isExpiringSoon: validity === 'EXPIRING_SOON',
-                // Observations only when FIT_WITH_OBSERVATIONS (authorized LSPD viewers).
+                // Observations only when FIT_WITH_OBSERVATIONS (authorized agency viewers).
                 observations:
                   evaluation.result === PsychotechnicalResult.FIT_WITH_OBSERVATIONS
                     ? evaluation.observations
@@ -352,7 +358,7 @@ export class OccupationalHealthService {
   }
 
   /**
-   * Institutional financial summary for LSPD (uses immutable invoice billing snapshots).
+   * Institutional financial summary per agency (uses immutable invoice billing snapshots).
    */
   async getInstitutionalFinance(query: {
     partner?: string;
@@ -361,7 +367,7 @@ export class OccupationalHealthService {
     to?: string;
   } = {}) {
     const partnerKey = this.resolvePartnerKey(query.partner);
-    const partner = INSTITUTIONAL_PARTNERS[partnerKey];
+    const partner = getInstitutionalPartner(partnerKey);
 
     let fromDate: Date;
     let toDate: Date;
@@ -463,7 +469,7 @@ export class OccupationalHealthService {
     };
   }
 
-  private async computePresetTotals(partner: (typeof INSTITUTIONAL_PARTNERS)['LSPD']) {
+  private async computePresetTotals(partner: IInstitutionalPartner) {
     const today = startOfUtcDay();
     const ranges = [7, 15, 30] as const;
     const result: Record<string, number> = {};
@@ -492,30 +498,20 @@ export class OccupationalHealthService {
   }
 
   /**
-   * Redacted patient occupational card for interop roles.
+   * Redacted patient occupational card, scoped to the requesting agency so a
+   * supervisor can never resolve an agent of a different partner.
    */
-  async getInteropPatientCard(patientId: string) {
-    const roster = await this.listInteropRoster({});
-    const item = roster.items.find((entry) => entry.patientId === patientId);
-    if (!item) {
-      const patient = await this.prismaService.patient.findUnique({
-        where: { id: patientId },
-        select: { id: true },
-      });
-      if (!patient) {
-        return null;
-      }
-      // Patient exists but is not part of the partner roster.
-      return null;
-    }
-    return item;
+  async getInteropPatientCard(patientId: string, partner?: string) {
+    const roster = await this.listInteropRoster({ partner });
+    return roster.items.find((entry) => entry.patientId === patientId) ?? null;
   }
 
+  /** Billing is always agency-scoped: an unknown agency must not silently fall back. */
   private resolvePartnerKey(raw?: string): InstitutionalPartnerKey {
-    const value = (raw ?? 'LSPD').trim().toUpperCase();
-    if (value in INSTITUTIONAL_PARTNERS) {
-      return value as InstitutionalPartnerKey;
+    const partnerKey = resolveInstitutionalPartnerKey(raw);
+    if (!partnerKey) {
+      throw new BadRequestException('A valid institutional partner is required');
     }
-    return 'LSPD';
+    return partnerKey;
   }
 }

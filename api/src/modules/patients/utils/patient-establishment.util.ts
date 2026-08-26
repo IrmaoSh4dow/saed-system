@@ -1,18 +1,15 @@
-import { LSPD_ESTABLISHMENT_SLUG } from '../../../common/constants/workplaces';
+import { supportsInstitutionalBadge } from '../../../common/constants/institutional-partners';
 
 const BADGE_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 
-export function isLspdEstablishment(establishment?: {
-  slug?: string | null;
-  name?: string | null;
-} | null): boolean {
-  if (!establishment) {
-    return false;
-  }
-  if (establishment.slug?.toLowerCase() === LSPD_ESTABLISHMENT_SLUG) {
-    return true;
-  }
-  return (establishment.name ?? '').trim().toLowerCase() === 'lspd';
+/**
+ * Badge/placa eligibility. Every institutional partner that issues badges
+ * (LSPD placa, LSCSO estrella) qualifies; civilian establishments never do.
+ */
+export function supportsBadgeNumber(
+  establishment?: { slug?: string | null; name?: string | null } | null,
+): boolean {
+  return supportsInstitutionalBadge(establishment);
 }
 
 export function normalizeBadgeNumber(value?: string | null): string | null {

@@ -29,17 +29,17 @@ import {
 import { SearchOccupationalHealthDto } from './dto/occupational-health.dto';
 import { InstitutionalPartnerService } from './institutional-partner.service';
 
-const PARTNER = INSTITUTIONAL_PARTNERS.LSPD.key;
+const PARTNER = INSTITUTIONAL_PARTNERS.LSCSO.key;
 
 /**
- * Los Santos Police Department interoperability module.
+ * Los Santos County Sheriff's Office interoperability module.
  * Behaviour lives in InstitutionalPartnerService; this controller only declares
  * the agency routes and the permissions that guard them.
  */
-@Controller('lspd')
+@Controller('lscso')
 @UseGuards(JwtAuthGuard, CharacterGuard, PermissionsGuard)
 @RequireCharacter(true)
-export class LspdController {
+export class LscsoController {
   constructor(
     private readonly institutionalPartnerService: InstitutionalPartnerService,
   ) {}
@@ -76,7 +76,7 @@ export class LspdController {
   }
 
   @Get('finance')
-  @Permissions('lspd.finance.read')
+  @Permissions('lscso.finance.read')
   getFinance(
     @Query() query: InstitutionalFinanceQueryDto,
     @CurrentCharacter() character: IAuthCharacter,

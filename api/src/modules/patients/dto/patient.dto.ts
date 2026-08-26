@@ -85,7 +85,7 @@ export class CreatePatientDto {
   @IsUUID()
   establishmentId?: string | null;
 
-  /** LSPD institutional badge/placa. Only allowed when establishment is LSPD. */
+  /** Institutional badge. Only allowed when the establishment is a partner agency. */
   @IsOptional()
   @ValidateIf((_, value) => value !== null && value !== undefined && value !== '')
   @IsString()

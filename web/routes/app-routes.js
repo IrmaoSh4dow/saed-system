@@ -39,6 +39,7 @@ import { incentivesPage } from '../pages/incentives.page.js';
 import { adminRequestsPage } from '../pages/admin-requests.page.js';
 import { createAdminRequestPage } from '../pages/create-admin-request.page.js';
 import { agreementsPage } from '../pages/agreements.page.js';
+import { lscsoPage } from '../pages/lscso.page.js';
 import { lspdPage } from '../pages/lspd.page.js';
 import { staffRatingsPage } from '../pages/staff-ratings.page.js';
 import { adminEstablishmentsPage } from '../pages/admin/admin-establishments.page.js';
@@ -142,6 +143,10 @@ export const privateRoutes = [
   {
     path: '/lspd',
     handler: lspdPage,
+  },
+  {
+    path: '/lscso',
+    handler: lscsoPage,
   },
   {
     path: '/occupational-health',

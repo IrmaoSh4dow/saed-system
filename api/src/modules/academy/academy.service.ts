@@ -614,7 +614,7 @@ export class AcademyService {
   }
 
   async listMyApplications(characterId: string) {
-    if (await this.permissionsService.belongsToLspd(characterId)) {
+    if (await this.permissionsService.belongsToSaed(characterId)) {
       throw new ForbiddenException('SAED members cannot access application submissions');
     }
 
@@ -661,7 +661,7 @@ export class AcademyService {
       throw new BadRequestException('discordUsername is required');
     }
 
-    if (await this.permissionsService.belongsToLspd(actor.characterId)) {
+    if (await this.permissionsService.belongsToSaed(actor.characterId)) {
       throw new ForbiddenException(
         'SAED members cannot submit academy or transfer applications',
       );

@@ -10,6 +10,12 @@ import {
   NotificationType,
   Prisma,
 } from '@prisma/client';
+import {
+  findPartnerByOrganization,
+  getInstitutionalPartner,
+  listInstitutionalPartners,
+  resolveInstitutionalPartnerKey,
+} from '../../common/constants/institutional-partners';
 import { TEMPORARY_ACCESS_CONFIG } from '../../common/temporary-access/temporary-access.config';
 import {
   computeExpiresAt,
@@ -95,16 +101,78 @@ export class MedicalReportAccessService {
     return Object.entries(REASON_LABELS).map(([value, label]) => ({ value, label }));
   }
 
-  async listRecipients() {
-    return this.prismaService.character.findMany({
-      where: {
-        roles: {
-          some: { role: { slug: TEMPORARY_ACCESS_CONFIG.RECIPIENT_ROLE_SLUG } },
-        },
+  /**
+   * External supervisors eligible to receive a grant. Optionally narrowed to a
+   * single agency so High Command can share a report with the right department.
+   */
+  async listRecipients(partner?: string) {
+    const partnerKey = resolveInstitutionalPartnerKey(partner);
+    const partners = partnerKey
+      ? listInstitutionalPartners().filter((item) => item.key === partnerKey)
+      : listInstitutionalPartners();
+    const roleSlugs = partners.map((item) => item.supervisorRoleSlug);
+
+    const characters = await this.prismaService.character.findMany({
+      where: { roles: { some: { role: { slug: { in: roleSlugs } } } } },
+      select: {
+        ...characterSelect,
+        roles: { select: { role: { select: { slug: true } } } },
       },
-      select: characterSelect,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
+
+    return characters.map(({ roles, ...character }) => {
+      const slugs = roles.map((entry) => entry.role.slug);
+      const matched = partners.find((item) => slugs.includes(item.supervisorRoleSlug));
+      return {
+        ...character,
+        organization: matched?.name ?? null,
+        partner: matched?.key ?? null,
+      };
+    });
+  }
+
+  /** Resolves the agency a recipient represents, based on its supervisor role. */
+  private async resolveRecipientPartner(recipientCharacterId: string) {
+    const partners = listInstitutionalPartners();
+    const character = await this.prismaService.character.findFirst({
+      where: {
+        id: recipientCharacterId,
+        roles: {
+          some: {
+            role: { slug: { in: partners.map((item) => item.supervisorRoleSlug) } },
+          },
+        },
+      },
+      select: {
+        ...characterSelect,
+        roles: { select: { role: { select: { slug: true } } } },
+      },
+    });
+    if (!character) {
+      return null;
+    }
+
+    const slugs = character.roles.map((entry) => entry.role.slug);
+    const partner = partners.find((item) => slugs.includes(item.supervisorRoleSlug));
+    return partner ? { partner, character } : null;
+  }
+
+  private static describePartners(): string {
+    return listInstitutionalPartners()
+      .map((partner) => partner.name)
+      .join(' / ');
+  }
+
+  /** Notification target: each agency reads its authorizations in its own module. */
+  private static resolveAuthorizedReportsHref(
+    organization: string | null,
+    grantId?: string,
+  ): string {
+    const partner =
+      findPartnerByOrganization(organization) ?? listInstitutionalPartners()[0];
+    const suffix = grantId ? `&grant=${grantId}` : '';
+    return `${partner.routePath}?tab=authorized-reports${suffix}`;
   }
 
   async expireStaleGrants() {
@@ -266,15 +334,25 @@ export class MedicalReportAccessService {
     return rows.map((item) => this.toSummary(item));
   }
 
-  async listAuthorizedForRecipient(characterId: string) {
+  /** Grants a recipient can read, optionally narrowed to the agency module in use. */
+  async listAuthorizedForRecipient(characterId: string, partner?: string) {
     await this.expireStaleGrants();
     const now = new Date();
+    const partnerKey = resolveInstitutionalPartnerKey(partner);
     const rows = await this.prismaService.medicalReportAccessGrant.findMany({
       where: {
         recipientCharacterId: characterId,
         status: MedicalReportAccessGrantStatus.ACTIVE,
         expiresAt: { gt: now },
         revokedAt: null,
+        ...(partnerKey
+          ? {
+              organization: {
+                in: [...getInstitutionalPartner(partnerKey).aliases],
+                mode: 'insensitive' as const,
+              },
+            }
+          : {}),
       },
       orderBy: { expiresAt: 'asc' },
       include: grantInclude,
@@ -299,20 +377,13 @@ export class MedicalReportAccessService {
       throw new NotFoundException('Report was not found');
     }
 
-    const recipient = await this.prismaService.character.findFirst({
-      where: {
-        id: dto.recipientCharacterId,
-        roles: {
-          some: { role: { slug: TEMPORARY_ACCESS_CONFIG.RECIPIENT_ROLE_SLUG } },
-        },
-      },
-      select: characterSelect,
-    });
-    if (!recipient) {
+    const resolved = await this.resolveRecipientPartner(dto.recipientCharacterId);
+    if (!resolved) {
       throw new BadRequestException(
-        'Recipient must be an active LSPD Medical Supervisor',
+        `Recipient must be an active Medical Supervisor of ${MedicalReportAccessService.describePartners()}`,
       );
     }
+    const { partner, character: recipient } = resolved;
 
     await this.expireStaleGrants();
     const existing = await this.prismaService.medicalReportAccessGrant.findFirst({
@@ -344,7 +415,7 @@ export class MedicalReportAccessService {
         reportId: dto.reportId,
         recipientCharacterId: dto.recipientCharacterId,
         grantedByCharacterId: actor.characterId,
-        organization: TEMPORARY_ACCESS_CONFIG.DEFAULT_ORGANIZATION,
+        organization: partner.name,
         reason: dto.reason,
         reasonNotes,
         status: MedicalReportAccessGrantStatus.ACTIVE,
@@ -379,7 +450,7 @@ export class MedicalReportAccessService {
       type: NotificationType.MEDICAL_REPORT_ACCESS_GRANTED,
       title: 'Acceso temporal a informe médico',
       body: `Se te concedió acceso al informe #${report.reportNumber} (${REASON_LABELS[dto.reason]}) por ${Math.round(durationMs / 3600000)}h.`,
-      href: `/lspd?tab=authorized-reports&grant=${created.id}`,
+      href: `${partner.routePath}?tab=authorized-reports&grant=${created.id}`,
       metadata: {
         grantId: created.id,
         reportId: report.id,
@@ -430,7 +501,7 @@ export class MedicalReportAccessService {
       type: NotificationType.MEDICAL_REPORT_ACCESS_REVOKED,
       title: 'Acceso a informe revocado',
       body: `Tu acceso temporal al informe #${grant.report.reportNumber} fue revocado por el SAED.`,
-      href: '/lspd?tab=authorized-reports',
+      href: MedicalReportAccessService.resolveAuthorizedReportsHref(grant.organization),
       metadata: { grantId, reportId: grant.reportId },
     });
 
@@ -440,12 +511,18 @@ export class MedicalReportAccessService {
   async getAuthorizedReport(
     grantId: string,
     actor: { accountId: string; characterId: string },
+    partner?: string,
   ) {
     await this.expireStaleGrants();
     const grant = await this.requireGrant(grantId);
 
     if (grant.recipientCharacterId !== actor.characterId) {
       throw new ForbiddenException('This authorization does not belong to you');
+    }
+
+    const partnerKey = resolveInstitutionalPartnerKey(partner);
+    if (partnerKey && findPartnerByOrganization(grant.organization)?.key !== partnerKey) {
+      throw new NotFoundException('Access grant was not found');
     }
 
     if (!isTemporaryAccessActive(grant)) {
@@ -531,7 +608,10 @@ export class MedicalReportAccessService {
         type: NotificationType.MEDICAL_REPORT_ACCESS_EXPIRING,
         title: 'Acceso a informe por expirar',
         body: `Tu acceso al informe #${grant.report.reportNumber} expira en menos de una hora.`,
-        href: `/lspd?tab=authorized-reports&grant=${grant.id}`,
+        href: MedicalReportAccessService.resolveAuthorizedReportsHref(
+          grant.organization,
+          grant.id,
+        ),
         metadata: {
           grantId: grant.id,
           expiresAt: grant.expiresAt.toISOString(),

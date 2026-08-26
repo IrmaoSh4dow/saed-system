@@ -4,6 +4,8 @@ import { MedicalReportAccessModule } from '../medical-report-access/medical-repo
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { PatientsModule } from '../patients/patients.module';
+import { InstitutionalPartnerService } from './institutional-partner.service';
+import { LscsoController } from './lscso.controller';
 import { LspdController } from './lspd.controller';
 import { MedicalLeavesService } from './medical-leaves.service';
 import { MedicalRecordAccessService } from './medical-record-access.service';
@@ -19,12 +21,13 @@ import { PsychotechnicalEvaluationsService } from './psychotechnical-evaluations
     MedicalReportAccessModule,
     forwardRef(() => PatientsModule),
   ],
-  controllers: [OccupationalHealthController, LspdController],
+  controllers: [OccupationalHealthController, LspdController, LscsoController],
   providers: [
     PsychotechnicalEvaluationsService,
     MedicalLeavesService,
     MedicalRecordAccessService,
     OccupationalHealthService,
+    InstitutionalPartnerService,
   ],
   exports: [
     PsychotechnicalEvaluationsService,

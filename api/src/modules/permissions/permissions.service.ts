@@ -162,9 +162,4 @@ export class PermissionsService {
       character.status === CharacterStatus.MEDICAL_STAFF
     );
   }
-
-  /** @deprecated Use belongsToSaed */
-  async belongsToLspd(characterId: string): Promise<boolean> {
-    return this.belongsToSaed(characterId);
-  }
 }

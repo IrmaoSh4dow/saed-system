@@ -15,6 +15,7 @@ export const APPOINTMENT_TYPE_LABELS = {
   MEDICAL: 'Médica',
   PSYCHOTECHNICAL_CIVIL: 'Psicotécnico civil',
   PSYCHOTECHNICAL_LSPD: 'Psicotécnico LSPD',
+  PSYCHOTECHNICAL_LSCSO: 'Psicotécnico LSCSO',
 };
 
 /**

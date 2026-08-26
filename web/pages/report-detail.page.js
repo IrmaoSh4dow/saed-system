@@ -323,7 +323,7 @@ function renderDetail(
               <article class="rounded-3xl border border-white/10 p-5 md:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 class="text-sm font-semibold text-white">Accesos temporales LSPD</h3>
+                    <h3 class="text-sm font-semibold text-white">Accesos temporales institucionales</h3>
                     <p class="mt-1 text-xs text-ink-500">
                       ${activeGrants.length} activo(s) · ${accessGrants.length} en historial
                     </p>
@@ -340,7 +340,9 @@ function renderDetail(
                       ? accessGrants
                           .map((grant) => {
                             const recipient = grant.recipientCharacter
-                              ? `${grant.recipientCharacter.firstName} ${grant.recipientCharacter.lastName}`
+                              ? `${grant.recipientCharacter.firstName} ${grant.recipientCharacter.lastName}${
+                                  grant.organization ? ` · ${grant.organization}` : ''
+                                }`
                               : '—';
                             return `
                               <div class="rounded-2xl border border-white/10 px-4 py-3">
@@ -660,7 +662,7 @@ function bindDetail(root, report, { onReload, canGrantAccess = false, canRevokeA
     setAppModalContent(root, {
       modalId: 'report-access-modal',
       title: 'Conceder Acceso Temporal',
-      bodyHtml: `<p class="text-sm text-ink-400">Cargando supervisores LSPD…</p>`,
+      bodyHtml: `<p class="text-sm text-ink-400">Cargando supervisores institucionales…</p>`,
       footerHtml: `<button type="button" class="btn-secondary" data-modal-close>Cancelar</button>`,
     });
     openAppModal(root, 'report-access-modal');
@@ -676,20 +678,23 @@ function bindDetail(root, report, { onReload, canGrantAccess = false, canRevokeA
         bodyHtml: `
           <form id="grant-access-form" class="space-y-4">
             <p class="text-sm text-ink-300">
-              Autoriza a un Supervisor médico del LSPD a consultar el informe
+              Autoriza a un Supervisor médico institucional a consultar el informe
               <span class="font-medium text-white">#${report.reportNumber}</span> de forma temporal.
             </p>
             <div>
-              <label class="form-label" for="grant-recipient">Supervisor LSPD</label>
+              <label class="form-label" for="grant-recipient">Supervisor institucional</label>
               <select id="grant-recipient" class="form-input" required>
                 <option value="">Seleccionar…</option>
                 ${recipients
                   .map(
                     (item) =>
-                      `<option value="${item.id}">${escapeHtml(`${item.firstName} ${item.lastName}`)}</option>`,
+                      `<option value="${item.id}">${escapeHtml(
+                        `${item.firstName} ${item.lastName}${item.organization ? ` — ${item.organization}` : ''}`,
+                      )}</option>`,
                   )
                   .join('')}
               </select>
+              <p class="form-hint">La agencia del supervisor determina a qué módulo llega el acceso.</p>
             </div>
             <div>
               <label class="form-label" for="grant-reason">Motivo</label>

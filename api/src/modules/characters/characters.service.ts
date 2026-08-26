@@ -13,7 +13,7 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { RolesService } from '../roles/roles.service';
 import { AuditService, AUDIT_TARGET } from '../audit/audit.service';
 import { EstablishmentsService } from '../establishments/establishments.service';
-import { isLspdEstablishment } from '../patients/utils/patient-establishment.util';
+import { supportsBadgeNumber } from '../patients/utils/patient-establishment.util';
 import { AvatarStorageService } from './avatar-storage.service';
 import { MAX_CHARACTERS_PER_ACCOUNT } from './constants/characters.constants';
 import { CreateCharacterDto } from './dto/create-character.dto';
@@ -458,7 +458,7 @@ export class CharactersService {
     const previousOccupation = character.occupations?.[0] ?? null;
     const previousOrganization = previousOccupation?.organization ?? null;
     const previousEstablishmentId = previousOccupation?.establishmentId ?? null;
-    const joiningLspd = isLspdEstablishment(workplace);
+    const keepsBadge = supportsBadgeNumber(workplace);
 
     await this.prismaService.$transaction(async (tx) => {
       await this.syncCivilianOccupation(tx, characterId, workplace.name);
@@ -468,7 +468,7 @@ export class CharactersService {
           where: { id: character.linkedPatient.id },
           data: {
             establishmentId: workplace.id,
-            badgeNumber: joiningLspd ? character.linkedPatient.badgeNumber : null,
+            badgeNumber: keepsBadge ? character.linkedPatient.badgeNumber : null,
           },
         });
       }
@@ -488,7 +488,7 @@ export class CharactersService {
         fromEstablishmentId: previousEstablishmentId,
         toEstablishmentId: workplace.id,
         linkedPatientSynced: Boolean(character.linkedPatient),
-        badgeCleared: Boolean(character.linkedPatient?.badgeNumber) && !joiningLspd,
+        badgeCleared: Boolean(character.linkedPatient?.badgeNumber) && !keepsBadge,
       },
     });
 

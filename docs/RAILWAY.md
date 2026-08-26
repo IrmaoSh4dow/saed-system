@@ -7,7 +7,7 @@ Monorepo con **dos servicios** independientes. Cada uno usa su propio `PORT` iny
 | API | `api` | Nixpacks (`api/railway.toml`) | `npx prisma migrate deploy && npm run prisma:seed && node server.cjs` |
 | Frontend | `web` | Nixpacks (`web/railway.toml`) | `npm run start:railway` |
 
-El módulo **LSPD** del producto (interoperabilidad policial) es intencional; no es branding legado del sistema. El producto se llama **SAED**.
+Los módulos **LSPD** y **LSCSO** del producto (interoperabilidad con agencias externas) son intencionales; no son branding legado del sistema. El producto se llama **SAED**.
 
 ---
 

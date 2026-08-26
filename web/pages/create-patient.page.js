@@ -9,11 +9,11 @@ import { initDashboardLayout, renderDashboardLayout } from '../layouts/dashboard
 import { getApiErrorMessage } from '../services/auth.service.js';
 import { listWorkplaces } from '../services/characters.service.js';
 import { createPatient, searchPatients } from '../services/patients.service.js';
+import { findPartnerByEstablishmentSlug } from '../config/institutional-partners.js';
 import { requireActiveCharacter, requirePermission } from '../utils/auth-guard.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 import { navigate } from '../utils/router.js';
 
-const LSPD_SLUG = 'lspd';
 const BADGE_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 
 export function createPatientPage() {
@@ -121,7 +121,7 @@ export function createPatientPage() {
               <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 space-y-4">
                 <div>
                   <p class="text-sm font-semibold text-white">Organización / establecimiento</p>
-                  <p class="mt-1 text-xs text-ink-500">Independiente del personaje. Se usa para convenios y directorio LSPD.</p>
+                  <p class="mt-1 text-xs text-ink-500">Independiente del personaje. Se usa para convenios y los directorios institucionales.</p>
                 </div>
                 <div>
                   <label class="form-label" for="patient-establishment">Establecimiento</label>
@@ -130,9 +130,9 @@ export function createPatientPage() {
                   </select>
                 </div>
                 <div id="patient-badge-wrap" class="hidden">
-                  <label class="form-label" for="patient-badge">Placa LSPD</label>
+                  <label class="form-label" for="patient-badge">Placa institucional</label>
                   <input id="patient-badge" class="form-input font-mono tracking-wide" maxlength="32" placeholder="Ej. 1A-12 / ADAM-21" autocomplete="off" />
-                  <p class="form-hint">Opcional. Solo disponible para pacientes del LSPD.</p>
+                  <p class="form-hint">Opcional. Solo disponible para pacientes de una agencia institucional.</p>
                 </div>
               </div>
               <div>
@@ -189,9 +189,9 @@ export function createPatientPage() {
         const wrap = root.querySelector('#patient-badge-wrap');
         const badgeInput = root.querySelector('#patient-badge');
         const selected = workplaces.find((item) => item.id === select?.value);
-        const isLspd = selected?.slug === LSPD_SLUG;
-        wrap?.classList.toggle('hidden', !isLspd);
-        if (!isLspd && badgeInput) {
+        const allowsBadge = Boolean(findPartnerByEstablishmentSlug(selected?.slug));
+        wrap?.classList.toggle('hidden', !allowsBadge);
+        if (!allowsBadge && badgeInput) {
           badgeInput.value = '';
         }
       };
@@ -216,7 +216,7 @@ export function createPatientPage() {
       const readPayload = (forceCreate = false) => {
         const establishmentId = root.querySelector('#patient-establishment')?.value || undefined;
         const selected = workplaces.find((item) => item.id === establishmentId);
-        const isLspd = selected?.slug === LSPD_SLUG;
+        const allowsBadge = Boolean(findPartnerByEstablishmentSlug(selected?.slug));
         const badgeRaw = root.querySelector('#patient-badge')?.value?.trim() ?? '';
         return {
           firstName: root.querySelector('#patient-first-name').value.trim(),
@@ -234,7 +234,7 @@ export function createPatientPage() {
           emergencyContactPhone: root.querySelector('#patient-emergency-phone').value.trim() || undefined,
           notes: root.querySelector('#patient-notes').value.trim() || undefined,
           establishmentId,
-          badgeNumber: isLspd && badgeRaw ? badgeRaw.toUpperCase() : undefined,
+          badgeNumber: allowsBadge && badgeRaw ? badgeRaw.toUpperCase() : undefined,
           forceCreate: forceCreate || Boolean(root.querySelector('#force-create')?.checked),
         };
       };

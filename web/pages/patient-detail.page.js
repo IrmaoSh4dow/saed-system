@@ -29,11 +29,11 @@ import {
   unlinkPatientCharacter,
   updatePatient,
 } from '../services/patients.service.js';
+import { findPartnerByEstablishmentSlug } from '../config/institutional-partners.js';
 import { requireActiveCharacter } from '../utils/auth-guard.js';
 import { formatDateLabel, formatDateTimeLabel } from '../utils/date.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
-const LSPD_SLUG = 'lspd';
 const BADGE_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 export function patientDetailPage(patientId) {
   if (!requireActiveCharacter()) {
@@ -357,7 +357,7 @@ function renderDetail(root, patient, options = {}) {
               ${metaCard('Documento', patient.identityDocument ?? '—')}
               ${metaCard('Nacionalidad', patient.nationality ?? '—')}
               ${metaCard('Organización', patient.establishment?.name ?? 'Sin organización')}
-              ${metaCard('Placa LSPD', patient.badgeNumber ?? '—')}
+              ${metaCard('Placa institucional', patient.badgeNumber ?? '—')}
               ${metaCard('Contacto emergencia', patient.emergencyContactName ?? '—')}
               ${metaCard('Tel. emergencia', patient.emergencyContactPhone ?? '—')}
               ${metaCard('Actualizado', formatDateTimeLabel(patient.updatedAt))}
@@ -506,13 +506,13 @@ function renderDetail(root, patient, options = {}) {
                   </select>
                 </div>
                 <div id="edit-badge-wrap" class="${
-                  patient.establishment?.slug === LSPD_SLUG ? '' : 'hidden'
+                  findPartnerByEstablishmentSlug(patient.establishment?.slug) ? '' : 'hidden'
                 }">
-                  <label class="form-label" for="edit-badge">Placa LSPD</label>
+                  <label class="form-label" for="edit-badge">Placa institucional</label>
                   <input id="edit-badge" class="form-input font-mono tracking-wide" maxlength="32" value="${escapeAttr(
                     patient.badgeNumber ?? '',
                   )}" placeholder="Ej. 1A-12" />
-                  <p class="form-hint">Se elimina automáticamente si el paciente deja el LSPD.</p>
+                  <p class="form-hint">Se elimina automáticamente si el paciente deja la agencia.</p>
                 </div>
               </div>
               <div class="grid gap-4 sm:grid-cols-2">
@@ -887,9 +887,11 @@ function bindActions(root, patient, options = {}) {
     const wrap = root.querySelector('#edit-badge-wrap');
     const badgeInput = root.querySelector('#edit-badge');
     const option = select?.selectedOptions?.[0];
-    const isLspd = option?.getAttribute('data-slug') === LSPD_SLUG;
-    wrap?.classList.toggle('hidden', !isLspd);
-    if (!isLspd && badgeInput) {
+    const allowsBadge = Boolean(
+      findPartnerByEstablishmentSlug(option?.getAttribute('data-slug')),
+    );
+    wrap?.classList.toggle('hidden', !allowsBadge);
+    if (!allowsBadge && badgeInput) {
       badgeInput.value = '';
     }
   };
@@ -998,9 +1000,9 @@ function bindActions(root, patient, options = {}) {
     event.preventDefault();
     const establishmentId = root.querySelector('#edit-establishment')?.value || null;
     const selected = workplaces.find((item) => item.id === establishmentId);
-    const isLspd = selected?.slug === LSPD_SLUG;
+    const allowsBadge = Boolean(findPartnerByEstablishmentSlug(selected?.slug));
     const badgeRaw = root.querySelector('#edit-badge')?.value?.trim() ?? '';
-    if (isLspd && badgeRaw && !BADGE_PATTERN.test(badgeRaw.toUpperCase())) {
+    if (allowsBadge && badgeRaw && !BADGE_PATTERN.test(badgeRaw.toUpperCase())) {
       setAuthAlert(root, {
         id: 'patient-detail-alert',
         type: 'error',
@@ -1020,7 +1022,7 @@ function bindActions(root, patient, options = {}) {
         notes: root.querySelector('#edit-notes').value.trim() || null,
         status: root.querySelector('#edit-status').value,
         establishmentId,
-        badgeNumber: isLspd ? badgeRaw.toUpperCase() || null : null,
+        badgeNumber: allowsBadge ? badgeRaw.toUpperCase() || null : null,
       });
       setAuthAlert(root, {
         id: 'patient-detail-alert',

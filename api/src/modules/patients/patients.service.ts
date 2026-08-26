@@ -15,9 +15,9 @@ import {
 } from './dto/patient-invoice.dto';
 import { CreatePatientDto, SearchPatientsDto, UpdatePatientDto } from './dto/patient.dto';
 import {
-  isLspdEstablishment,
   isValidBadgeNumber,
   normalizeBadgeNumber,
+  supportsBadgeNumber,
 } from './utils/patient-establishment.util';
 import {
   buildNormalizedFullName,
@@ -963,8 +963,8 @@ export class PatientsService {
 
   /**
    * Resolves establishment + badge rules:
-   * - badge only allowed for LSPD
-   * - leaving LSPD auto-clears badge
+   * - badge only allowed for institutional partners that issue one
+   * - leaving that establishment auto-clears the badge
    */
   private async resolveWorkplaceFields(input: {
     establishmentId?: string | null;
@@ -984,16 +984,16 @@ export class PatientsService {
       }
     } else if (!input.allowMissingEstablishment && input.badgeNumber) {
       throw new BadRequestException(
-        'badgeNumber requires an LSPD establishment on the patient',
+        'badgeNumber requires an institutional establishment on the patient',
       );
     }
 
-    const isLspd = isLspdEstablishment(establishment);
+    const allowsBadge = supportsBadgeNumber(establishment);
     const requestedBadge = normalizeBadgeNumber(input.badgeNumber);
 
-    if (requestedBadge && !isLspd) {
+    if (requestedBadge && !allowsBadge) {
       throw new BadRequestException(
-        'La placa institucional solo puede asignarse a pacientes del LSPD',
+        'La placa institucional solo puede asignarse a pacientes de una agencia institucional',
       );
     }
 
@@ -1005,7 +1005,7 @@ export class PatientsService {
 
     return {
       establishmentId: establishment?.id ?? null,
-      badgeNumber: isLspd ? requestedBadge : null,
+      badgeNumber: allowsBadge ? requestedBadge : null,
     };
   }
 
