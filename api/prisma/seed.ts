@@ -381,7 +381,8 @@ const MEDICAL_DIRECTOR_BASE = [
 /**
  * External agency interop — redacted occupational fitness only (no clinical chart).
  * Shared by every institutional partner; the agency a supervisor can reach is
- * decided by its role slug, not by extra permissions.
+ * decided by its role slug, so only the agency-scoped billing permission is
+ * added per role.
  */
 const INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS = [
   'auth.session',
@@ -461,15 +462,15 @@ const ROLES = [
     name: 'LSPD Medical Supervisor',
     slug: 'lspd-medical-supervisor',
     description:
-      'External LSPD interoperability role — occupational fitness only (no clinical chart access)',
-    permissions: [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS],
+      'External LSPD interoperability role — occupational fitness and own billing only (no clinical chart access)',
+    permissions: [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS, 'lspd.finance.read'],
   },
   {
     name: 'LSCSO Medical Supervisor',
     slug: 'lscso-medical-supervisor',
     description:
-      'External LSCSO interoperability role — occupational fitness only (no clinical chart access)',
-    permissions: [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS],
+      'External LSCSO interoperability role — occupational fitness and own billing only (no clinical chart access)',
+    permissions: [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS, 'lscso.finance.read'],
   },
 ] as const;
 

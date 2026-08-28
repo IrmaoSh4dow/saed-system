@@ -63,7 +63,10 @@ const SHARED_PERMISSIONS = [
   },
 ];
 
-/** Mirrors INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS in prisma/seed.ts. */
+/**
+ * Mirrors INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS in prisma/seed.ts. Each
+ * supervisor also gets the billing permission of its own agency.
+ */
 const SUPERVISOR_PERMISSIONS = [
   'auth.session',
   'dashboard.read',
@@ -159,7 +162,10 @@ async function main() {
       },
     });
 
-    await attachPermissions(partner.roleSlug, SUPERVISOR_PERMISSIONS);
+    await attachPermissions(partner.roleSlug, [
+      ...SUPERVISOR_PERMISSIONS,
+      partner.financePermission.key,
+    ]);
     console.log(`ensured establishment + role for ${partner.key}`);
   }
 

@@ -114,8 +114,8 @@ export const PERMISSIONS = {
 
 /**
  * Shared by every institutional partner supervisor (LSPD, LSCSO…). The agency a
- * supervisor can reach is decided by its role slug on the backend, never by
- * extra permissions.
+ * supervisor can reach is decided by its role slug on the backend, so only the
+ * agency-scoped billing permission is added per role.
  */
 const INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS = [
   PERMISSIONS.DASHBOARD_READ,
@@ -361,8 +361,14 @@ const ROLE_PERMISSION_MAP = {
   ],
   'medical-director': ['*'],
   administrator: ['*'],
-  'lspd-medical-supervisor': [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS],
-  'lscso-medical-supervisor': [...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS],
+  'lspd-medical-supervisor': [
+    ...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS,
+    PERMISSIONS.LSPD_FINANCE_READ,
+  ],
+  'lscso-medical-supervisor': [
+    ...INSTITUTIONAL_MEDICAL_SUPERVISOR_PERMISSIONS,
+    PERMISSIONS.LSCSO_FINANCE_READ,
+  ],
 };
 
 export function resolvePermissionsForCharacter(character) {
