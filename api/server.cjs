@@ -2,12 +2,9 @@
 
 /**
  * Railway / production entry.
- * Listens on process.env.PORT (default 8080) at 0.0.0.0, then runs migrations,
- * Nest, and catalog seed.
- *
- * Nest must not wait for prisma:seed. Changing an env var (for example a Discord
- * webhook) triggers a redeploy; waiting on hundreds of sequential upserts against
- * a remote database left login returning 503 for minutes.
+ * Listens on process.env.PORT (default 8080) at 0.0.0.0, then runs migrations
+ * and Nest. Catalog seed is opt-in (`RUN_PRISMA_SEED=true`) so redeploys keep
+ * existing database data.
  */
 
 const http = require('node:http');
@@ -162,11 +159,31 @@ async function bootstrap() {
 }
 
 async function runSeedInBackground() {
+  // Seed is opt-in. Running it on every Railway redeploy re-upserts catalogs and
+  // the bootstrap account; operational prune is a separate flag, but the seed is
+  // still expensive and can block or rewrite identity data.
+  if (!isStepEnabled('RUN_PRISMA_SEED') || isStepSkipped('SKIP_PRISMA_SEED')) {
+    state.seed = 'skipped';
+    console.log(
+      JSON.stringify({
+        msg: 'startup_step_skipped',
+        step: 'prisma-seed',
+        via: isStepSkipped('SKIP_PRISMA_SEED') ? 'SKIP_PRISMA_SEED' : 'RUN_PRISMA_SEED',
+      }),
+    );
+    return;
+  }
+
   state.seed = 'running';
   state.seed = await runStartupStep('prisma-seed', 'SKIP_PRISMA_SEED', 'npm', [
     'run',
     'prisma:seed',
   ]);
+}
+
+function isStepEnabled(envKey) {
+  const value = (process.env[envKey] || '').toLowerCase();
+  return value === 'true' || value === '1';
 }
 
 function isStepSkipped(envKey) {

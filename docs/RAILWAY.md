@@ -4,7 +4,7 @@ Monorepo con **dos servicios** independientes. Cada uno usa su propio `PORT` iny
 
 | Servicio | Root Directory | Builder | Start |
 |----------|----------------|---------|-------|
-| API | `api` | Nixpacks (`api/railway.toml`) | `npx prisma migrate deploy && npm run prisma:seed && node server.cjs` |
+| API | `api` | Nixpacks (`api/railway.toml`) | `node server.cjs` |
 | Frontend | `web` | Nixpacks (`web/railway.toml`) | `npm run start:railway` |
 
 Los módulos **LSPD** y **LSCSO** del producto (interoperabilidad con agencias externas) son intencionales; no son branding legado del sistema. El producto se llama **SAED**.
@@ -19,8 +19,8 @@ Los módulos **LSPD** y **LSCSO** del producto (interoperabilidad con agencias e
 2. **Start:** `node server.cjs`, que ejecuta en este orden:
    - `listen` en `0.0.0.0:$PORT` → el puerto se abre **antes** que cualquier otra cosa
    - `npx prisma migrate deploy` → aplica migraciones sobre `DATABASE_URL` (conserva datos)
-   - `npm run prisma:seed` → catálogos + cuenta `@sh4dow` + prune operativo (ver abajo)
    - arranque de Nest
+   - `npm run prisma:seed` **solo si** `RUN_PRISMA_SEED=true` (por defecto no se siembra; los datos existentes se conservan)
 3. **Healthcheck:** `GET /health` (timeout 300s para dar margen a migrate/seed)
 
 Ningún paso puede tumbar el proceso. Si migrate o seed fallan, el puerto sigue abierto y `/health` responde `200` con `status: "degraded"` indicando qué paso falló. Esto es intencionado: encadenar `migrate && seed && node server.cjs` en el start command hacía que cualquier fallo dejara el puerto cerrado y Railway solo reportara `service unavailable`, sin pista de la causa.
@@ -35,7 +35,8 @@ Ningún paso puede tumbar el proceso. Si migrate o seed fallan, el puerto sigue 
 | `AUTH_CONTEXT_CACHE_TTL_MS` | No | Default `45000`. Cache en memoria del contexto JWT (cuenta/personaje/permisos). |
 | `SLOW_REQUEST_LOG_MS` | No | Default `2000`. Umbral para registrar `Slow request METHOD /ruta took Xms`. |
 | `SKIP_PRISMA_MIGRATE` | No | `true` para no ejecutar `prisma migrate deploy` en el arranque. |
-| `SKIP_PRISMA_SEED` | No | `true` para no ejecutar el seed en el arranque. |
+| `SKIP_PRISMA_SEED` | No | `true` fuerza a no sembrar. El seed **no corre** salvo `RUN_PRISMA_SEED=true`. |
+| `RUN_PRISMA_SEED` | No | `true` para sembrar catálogos/`@sh4dow` en ese arranque. Por defecto no se ejecuta. |
 | `JWT_SECRET` | Sí | ≥ 16 caracteres |
 | `FRONTEND_URL` | Sí | Origen(es) del front, separados por coma |
 | `API_PREFIX` | No | Default `api/v1` |

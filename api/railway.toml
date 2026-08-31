@@ -6,10 +6,7 @@ builder = "NIXPACKS"
 buildCommand = "npm run build"
 
 [deploy]
-# server.cjs binds PORT first, then runs migrate + seed + Nest boot itself.
-# Chaining migrate/seed ahead of the listener made any of their failures show up
-# as an unreachable service instead of a diagnosable /health response.
-# Seed upserts catalogs/@sh4dow; operational prune only if PRUNE_OPERATIONAL_DATA=true.
+# server.cjs binds PORT first, then migrate + Nest. Catalog seed is opt-in via RUN_PRISMA_SEED.
 startCommand = "node server.cjs"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
