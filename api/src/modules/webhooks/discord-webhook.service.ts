@@ -57,29 +57,19 @@ export class DiscordWebhookService implements OnModuleInit {
       return false;
     }
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        this.logger.warn(
-          `Discord webhook failed (${response.status}): ${body.slice(0, 240)}`,
-        );
-        return false;
-      }
-
-      this.logger.log(`Discord webhook delivered (${response.status})`);
+    const sanitized = this.sanitizePayload(payload);
+    const delivered = await this.postWebhook(url, sanitized);
+    if (delivered) {
       return true;
-    } catch (error) {
-      this.logger.warn(
-        `Discord webhook request error: ${error instanceof Error ? error.message : 'unknown'}`,
-      );
+    }
+
+    const hadMedia = sanitized.embeds?.some((embed) => embed.thumbnail || embed.image);
+    if (!hadMedia) {
       return false;
     }
+
+    this.logger.warn('Discord webhook rejected with media; retrying without images');
+    return this.postWebhook(url, this.stripEmbedMedia(sanitized));
   }
 
   async sendShiftEmbed(embed: IDiscordEmbed): Promise<boolean> {
@@ -87,6 +77,15 @@ export class DiscordWebhookService implements OnModuleInit {
       ['discord.shiftsWebhookUrl'],
       ['DISCORD_SHIFTS_WEBHOOK_URL'],
     );
+    if (!webhookUrl) {
+      this.logger.warn(
+        'Shifts Discord webhook skipped: no webhook URL configured. ' +
+          'Set DISCORD_SHIFTS_WEBHOOK_URL on the API service ' +
+          '(Railway → API → Variables), then redeploy.',
+      );
+      return false;
+    }
+
     return this.send(webhookUrl, {
       username: 'SAED Duty Desk',
       embeds: [embed],
@@ -274,6 +273,74 @@ export class DiscordWebhookService implements OnModuleInit {
       return null;
     }
     return `${base.replace(/\/$/, '')}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+  }
+
+  private async postWebhook(
+    url: string,
+    payload: IDiscordWebhookPayload,
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'SAED-Management-System/1.0',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        this.logger.warn(
+          `Discord webhook failed (${response.status}): ${body.slice(0, 240)}`,
+        );
+        return false;
+      }
+
+      this.logger.log(`Discord webhook delivered (${response.status})`);
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `Discord webhook request error: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+      return false;
+    }
+  }
+
+  private sanitizePayload(payload: IDiscordWebhookPayload): IDiscordWebhookPayload {
+    return {
+      ...payload,
+      embeds: payload.embeds?.map((embed) => this.sanitizeEmbed(embed)),
+    };
+  }
+
+  private stripEmbedMedia(payload: IDiscordWebhookPayload): IDiscordWebhookPayload {
+    return {
+      ...payload,
+      embeds: payload.embeds?.map((embed) => ({
+        ...embed,
+        thumbnail: undefined,
+        image: undefined,
+      })),
+    };
+  }
+
+  private sanitizeEmbed(embed: IDiscordEmbed): IDiscordEmbed {
+    const thumbnailUrl = this.resolveDiscordImageUrl(embed.thumbnail?.url);
+    const imageUrl = this.resolveDiscordImageUrl(embed.image?.url);
+    const fields = embed.fields?.map((field) => ({
+      name: truncatePlainText(field.name, 256) || '—',
+      value: truncatePlainText(field.value, 1024) || '—',
+      inline: field.inline,
+    }));
+
+    return {
+      ...embed,
+      title: embed.title ? truncatePlainText(embed.title, TITLE_MAX) : embed.title,
+      thumbnail: thumbnailUrl ? { url: thumbnailUrl } : undefined,
+      image: imageUrl ? { url: imageUrl } : undefined,
+      fields,
+    };
   }
 
   /**

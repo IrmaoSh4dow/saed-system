@@ -3,8 +3,8 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { DiscordWebhookService } from '../webhooks/discord-webhook.service';
@@ -25,10 +25,11 @@ const staffDutyInclude = {
 
 @Injectable()
 export class ShiftsService {
+  private readonly logger = new Logger(ShiftsService.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly discordWebhookService: DiscordWebhookService,
-    private readonly configService: ConfigService,
   ) {}
 
   async getCurrent(characterId: string) {
@@ -230,24 +231,35 @@ export class ShiftsService {
     timezone: string | null,
   ) {
     const fullName = `${staffProfile.character.firstName} ${staffProfile.character.lastName}`.trim();
-    const thumbnail = this.resolveAvatarUrl(staffProfile.character.avatarUrl);
+    const thumbnailUrl = staffProfile.character.avatarUrl?.trim() || null;
 
-    await this.discordWebhookService.sendShiftEmbed({
-      title: 'Entrada de servicio',
-      color: 0xb94a42,
-      timestamp: startedAt.toISOString(),
-      thumbnail: thumbnail ? { url: thumbnail } : undefined,
-      footer: { text: 'SAED Management System · Duty Desk' },
-      fields: [
-        { name: 'Empleado', value: fullName, inline: true },
-        { name: 'Nº empleado', value: staffProfile.employeeNumber, inline: true },
-        { name: 'Departamento', value: staffProfile.department?.name ?? 'Sin departamento', inline: true },
-        { name: 'Cargo', value: staffProfile.rank?.name ?? '—', inline: true },
-        { name: 'Fecha', value: formatDate(startedAt, timezone), inline: true },
-        { name: 'Hora de entrada', value: formatTime(startedAt, timezone), inline: true },
-        { name: 'Estado', value: 'En Servicio', inline: true },
-      ],
-    });
+    try {
+      const delivered = await this.discordWebhookService.sendShiftEmbed({
+        title: 'Entrada de servicio',
+        color: 0xb94a42,
+        timestamp: startedAt.toISOString(),
+        thumbnail: thumbnailUrl ? { url: thumbnailUrl } : undefined,
+        footer: { text: 'SAED Management System · Duty Desk' },
+        fields: [
+          { name: 'Empleado', value: fullName || '—', inline: true },
+          { name: 'Nº empleado', value: staffProfile.employeeNumber || '—', inline: true },
+          { name: 'Departamento', value: staffProfile.department?.name ?? 'Sin departamento', inline: true },
+          { name: 'Cargo', value: staffProfile.rank?.name ?? '—', inline: true },
+          { name: 'Fecha', value: formatDate(startedAt, timezone), inline: true },
+          { name: 'Hora de entrada', value: formatTime(startedAt, timezone), inline: true },
+          { name: 'Estado', value: 'En Servicio', inline: true },
+        ],
+      });
+      if (!delivered) {
+        this.logger.warn(`Discord clock-in webhook was not delivered for ${fullName}`);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Discord clock-in webhook error for ${fullName}: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+      );
+    }
   }
 
   private async notifyClockOut(
@@ -269,46 +281,40 @@ export class ShiftsService {
     }
 
     const fullName = `${staffProfile.character.firstName} ${staffProfile.character.lastName}`.trim();
-    const thumbnail = this.resolveAvatarUrl(staffProfile.character.avatarUrl);
+    const thumbnailUrl = staffProfile.character.avatarUrl?.trim() || null;
 
-    await this.discordWebhookService.sendShiftEmbed({
-      title: 'Salida de servicio',
-      color: 0x564c4c,
-      timestamp: shift.endedAt.toISOString(),
-      thumbnail: thumbnail ? { url: thumbnail } : undefined,
-      footer: { text: 'SAED Management System · Duty Desk' },
-      fields: [
-        { name: 'Empleado', value: fullName, inline: true },
-        { name: 'Nº empleado', value: staffProfile.employeeNumber, inline: true },
-        { name: 'Departamento', value: staffProfile.department?.name ?? 'Sin departamento', inline: true },
-        { name: 'Cargo', value: staffProfile.rank?.name ?? '—', inline: true },
-        { name: 'Hora de entrada', value: formatTime(shift.startedAt, shift.timezone), inline: true },
-        { name: 'Hora de salida', value: formatTime(shift.endedAt, shift.timezone), inline: true },
-        {
-          name: 'Tiempo trabajado',
-          value: formatDuration(shift.durationSeconds ?? 0),
-          inline: true,
-        },
-        { name: 'Estado', value: 'Fuera de Servicio', inline: true },
-      ],
-    });
-  }
-
-  private resolveAvatarUrl(avatarUrl: string | null) {
-    if (!avatarUrl) {
-      return null;
+    try {
+      const delivered = await this.discordWebhookService.sendShiftEmbed({
+        title: 'Salida de servicio',
+        color: 0x564c4c,
+        timestamp: shift.endedAt.toISOString(),
+        thumbnail: thumbnailUrl ? { url: thumbnailUrl } : undefined,
+        footer: { text: 'SAED Management System · Duty Desk' },
+        fields: [
+          { name: 'Empleado', value: fullName || '—', inline: true },
+          { name: 'Nº empleado', value: staffProfile.employeeNumber || '—', inline: true },
+          { name: 'Departamento', value: staffProfile.department?.name ?? 'Sin departamento', inline: true },
+          { name: 'Cargo', value: staffProfile.rank?.name ?? '—', inline: true },
+          { name: 'Hora de entrada', value: formatTime(shift.startedAt, shift.timezone), inline: true },
+          { name: 'Hora de salida', value: formatTime(shift.endedAt, shift.timezone), inline: true },
+          {
+            name: 'Tiempo trabajado',
+            value: formatDuration(shift.durationSeconds ?? 0),
+            inline: true,
+          },
+          { name: 'Estado', value: 'Fuera de Servicio', inline: true },
+        ],
+      });
+      if (!delivered) {
+        this.logger.warn(`Discord clock-out webhook was not delivered for ${fullName}`);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Discord clock-out webhook error for ${fullName}: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+      );
     }
-    if (/^https?:\/\//i.test(avatarUrl)) {
-      return avatarUrl;
-    }
-    const base =
-      this.configService.get<string>('discord.publicAssetBaseUrl') ||
-      this.configService.get<string>('app.frontendUrl') ||
-      '';
-    if (!base) {
-      return null;
-    }
-    return `${base.replace(/\/$/, '')}${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
   }
 }
 
