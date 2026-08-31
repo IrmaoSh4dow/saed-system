@@ -3,12 +3,11 @@
 /**
  * Railway / production entry.
  * Listens on process.env.PORT (default 8080) at 0.0.0.0, then runs migrations,
- * seed and Nest boot in that order.
+ * Nest, and catalog seed.
  *
- * Migrations and seed run *after* listen on purpose: chaining them ahead of the
- * listener (start command with `&&`) means any migrate/seed failure leaves the
- * port closed, and Railway reports the deploy as "service unavailable" with no
- * usable diagnosis. Here every step is non-fatal and surfaced through /health.
+ * Nest must not wait for prisma:seed. Changing an env var (for example a Discord
+ * webhook) triggers a redeploy; waiting on hundreds of sequential upserts against
+ * a remote database left login returning 503 for minutes.
  */
 
 const http = require('node:http');
@@ -142,7 +141,7 @@ function applyBootstrapCors(req, res) {
  * real state so a failed migration is visible instead of killing the service.
  */
 function resolveHealthStatus() {
-  if (state.bootError || state.migrations === 'failed' || state.seed === 'failed') {
+  if (state.bootError || state.migrations === 'failed') {
     return 'degraded';
   }
 
@@ -157,12 +156,17 @@ async function bootstrap() {
     ['prisma', 'migrate', 'deploy'],
   );
 
+  await loadNest();
+
+  void runSeedInBackground();
+}
+
+async function runSeedInBackground() {
+  state.seed = 'running';
   state.seed = await runStartupStep('prisma-seed', 'SKIP_PRISMA_SEED', 'npm', [
     'run',
     'prisma:seed',
   ]);
-
-  await loadNest();
 }
 
 function isStepSkipped(envKey) {
