@@ -35,6 +35,7 @@ import {
 } from '../pages/academy-applications.page.js';
 import { regulationsPage } from '../pages/regulations.page.js';
 import { shiftsPage } from '../pages/shifts.page.js';
+import { eventParticipationsPage } from '../pages/event-participations.page.js';
 import { incentivesPage } from '../pages/incentives.page.js';
 import { adminRequestsPage } from '../pages/admin-requests.page.js';
 import { createAdminRequestPage } from '../pages/create-admin-request.page.js';
@@ -46,6 +47,7 @@ import { adminEstablishmentsPage } from '../pages/admin/admin-establishments.pag
 import { adminInstitutionalPaymentsPage } from '../pages/admin/admin-institutional-payments.page.js';
 import { adminMedicalReportAccessPage } from '../pages/admin/admin-medical-report-access.page.js';
 import { adminEmploymentChangePage } from '../pages/admin/admin-employment-change.page.js';
+import { adminEventParticipationsPage } from '../pages/admin/admin-event-participations.page.js';
 import { PERMISSIONS } from '../utils/permissions.js';
 
 export const privateRoutes = [
@@ -131,9 +133,19 @@ export const privateRoutes = [
     permission: PERMISSIONS.EMPLOYMENT_CHANGE_REVIEW,
   },
   {
+    path: '/admin/event-participations',
+    handler: adminEventParticipationsPage,
+    permission: PERMISSIONS.EVENT_PARTICIPATIONS_MANAGE,
+  },
+  {
     path: '/shifts',
     handler: shiftsPage,
     permission: PERMISSIONS.SHIFTS_READ,
+  },
+  {
+    path: '/event-participations',
+    handler: eventParticipationsPage,
+    permission: PERMISSIONS.EVENT_PARTICIPATIONS_READ,
   },
   {
     path: '/agreements',

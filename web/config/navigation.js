@@ -65,6 +65,16 @@ export const SIDEBAR_NAVIGATION = [
     icon: 'heartPulse',
   },
   {
+    name: 'Participación de Eventos',
+    path: '/event-participations',
+    permission: PERMISSIONS.EVENT_PARTICIPATIONS_READ,
+    anyPermissions: [
+      PERMISSIONS.EVENT_PARTICIPATIONS_READ,
+      PERMISSIONS.EVENT_PARTICIPATIONS_CREATE,
+    ],
+    icon: 'calendar',
+  },
+  {
     name: 'Incentivos',
     path: '/incentives',
     permission: PERMISSIONS.INCENTIVES_READ,
@@ -310,6 +320,15 @@ export const ADMIN_NAVIGATION = [
     anyPermissions: [
       PERMISSIONS.EMPLOYMENT_CHANGE_REVIEW,
       PERMISSIONS.EMPLOYMENT_CHANGE_MANAGE,
+      PERMISSIONS.ADMIN_ACCESS,
+    ],
+  },
+  {
+    name: 'Participación de Eventos',
+    path: '/admin/event-participations',
+    permission: PERMISSIONS.EVENT_PARTICIPATIONS_MANAGE,
+    anyPermissions: [
+      PERMISSIONS.EVENT_PARTICIPATIONS_MANAGE,
       PERMISSIONS.ADMIN_ACCESS,
     ],
   },

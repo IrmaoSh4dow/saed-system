@@ -35,6 +35,7 @@ import { EstablishmentsModule } from './modules/establishments/establishments.mo
 import { AgreementsModule } from './modules/agreements/agreements.module';
 import { OccupationalHealthModule } from './modules/occupational-health/occupational-health.module';
 import { StaffRatingsModule } from './modules/staff-ratings/staff-ratings.module';
+import { EventParticipationsModule } from './modules/event-participations/event-participations.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
@@ -67,6 +68,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     EmploymentChangeModule,
     OccupationalHealthModule,
     StaffRatingsModule,
+    EventParticipationsModule,
     PatientsModule,
     ReportsModule,
     AcademyModule,

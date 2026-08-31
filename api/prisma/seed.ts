@@ -216,6 +216,9 @@ const PERMISSIONS = [
   { key: 'shifts.read', description: 'View own duty shifts and statistics' },
   { key: 'shifts.clock', description: 'Clock in and out of duty' },
   { key: 'shifts.manage', description: 'Manage duty shifts across staff' },
+  { key: 'event-participations.read', description: 'View SAED event participation records' },
+  { key: 'event-participations.create', description: 'Register SAED event participation' },
+  { key: 'event-participations.manage', description: 'Manage all SAED event participation records' },
   { key: 'incentives.read', description: 'View institutional incentives module' },
   { key: 'incentives.manage', description: 'Manage institutional incentives administration' },
   { key: 'incentives.pay', description: 'Register incentive payments to staff' },
@@ -272,6 +275,8 @@ const INTERN_BASE = [
   'regulations.read',
   'shifts.read',
   'shifts.clock',
+  'event-participations.read',
+  'event-participations.create',
   'agreements.read',
   'psychotechnical-evaluations.read',
   'medical-leaves.read',
@@ -361,6 +366,7 @@ const DEPUTY_MEDICAL_DIRECTOR_BASE = [
   'employment-change.manage',
   'staff-ratings.read',
   'staff-ratings.dashboard',
+  'event-participations.manage',
 ] as const;
 
 const MEDICAL_DIRECTOR_BASE = [
@@ -784,6 +790,8 @@ async function pruneOperationalData(): Promise<void> {
     TRUNCATE TABLE
       "StaffRating",
       "IncentivePayment",
+      "EventParticipationParticipant",
+      "EventParticipation",
       "StaffShift",
       "MedicalRecordAccessRequest",
       "MedicalReportAccessViewLog",

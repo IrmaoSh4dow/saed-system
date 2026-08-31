@@ -69,5 +69,6 @@ export const envValidationSchema = Joi.object({
   DISCORD_NEWS_WEBHOOK_URL: optionalHttpUrl(),
   DISCORD_APPLICATIONS_WEBHOOK_URL: optionalHttpUrl(),
   DISCORD_ANNOUNCEMENTS_WEBHOOK_URL: optionalHttpUrl(),
+  DISCORD_EVENTS_WEBHOOK_URL: optionalHttpUrl(),
   PUBLIC_ASSET_BASE_URL: optionalHttpUrl(),
 });

@@ -48,6 +48,7 @@ Ningún paso puede tumbar el proceso. Si migrate o seed fallan, el puerto sigue 
 | `DISCORD_NEWS_WEBHOOK_URL` | No | Webhook al publicar noticias |
 | `DISCORD_APPLICATIONS_WEBHOOK_URL` | No | Webhook al abrir convocatorias (Academia / Traslado) |
 | `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | No | Fallback compartido para noticias/postulaciones |
+| `DISCORD_EVENTS_WEBHOOK_URL` | No | Webhook de participación de eventos |
 | `PUBLIC_ASSET_BASE_URL` | No | Origen público HTTPS de la API (imágenes de embeds) |
 
 ### Discord webhooks (obligatorio configurar en el panel)

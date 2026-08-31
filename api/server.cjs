@@ -34,6 +34,7 @@ console.log(
         process.env.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL,
     ),
     hasDiscordShiftsWebhook: Boolean(process.env.DISCORD_SHIFTS_WEBHOOK_URL),
+    hasDiscordEventsWebhook: Boolean(process.env.DISCORD_EVENTS_WEBHOOK_URL),
     hasPublicAssetBaseUrl: Boolean(process.env.PUBLIC_ASSET_BASE_URL),
   }),
 );

@@ -102,6 +102,21 @@ export function adminHomePage() {
         },
       ],
     },
+    {
+      title: 'Operaciones',
+      description: 'Registros operativos del personal SAED.',
+      cards: [
+        {
+          title: 'Participación de Eventos',
+          href: '/admin/event-participations',
+          description: 'Plantillas de asistencia, organizadores y participantes.',
+          show:
+            can(PERMISSIONS.EVENT_PARTICIPATIONS_MANAGE) ||
+            can(PERMISSIONS.EVENT_PARTICIPATIONS_READ) ||
+            can(PERMISSIONS.ADMIN_ACCESS),
+        },
+      ],
+    },
   ]
     .map((group) => ({
       ...group,

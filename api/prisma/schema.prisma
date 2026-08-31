@@ -442,6 +442,8 @@ model Character {
   employmentChangeRequestsApproved    EmploymentChangeRequest[]    @relation("EmploymentChangeApprovedBy")
   employmentChangeRequestsRejected    EmploymentChangeRequest[]    @relation("EmploymentChangeRejectedBy")
   staffRatingsGiven                   StaffRating[]                @relation("StaffRatingReviewer")
+  eventParticipationsSubmitted        EventParticipation[]          @relation("EventParticipationSubmittedBy")
+  eventParticipationEntries           EventParticipationParticipant[] @relation("EventParticipationParticipantCharacter")
   applicationConfigsOpened            ApplicationConfiguration[]   @relation("ApplicationConfigOpenedBy")
   applicationConfigsClosed            ApplicationConfiguration[]   @relation("ApplicationConfigClosedBy")
   createdAt      DateTime        @default(now())
@@ -780,6 +782,39 @@ model StaffShift {
   @@index([staffProfileId, status])
   @@index([staffProfileId, startedAt])
   @@index([characterId, startedAt])
+}
+
+/// SAED attendance record for an external or institutional event.
+model EventParticipation {
+  id                       String   @id @default(uuid())
+  eventDate                DateTime @db.Date
+  organizers               String
+  payerFullName            String
+  authorizingOfficerName   String
+  saedLeadName             String
+  submittedByCharacterId  String
+  submittedByCharacter     Character @relation("EventParticipationSubmittedBy", fields: [submittedByCharacterId], references: [id], onDelete: Restrict)
+  discordDelivered         Boolean   @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  participants             EventParticipationParticipant[]
+
+  @@index([eventDate])
+  @@index([submittedByCharacterId])
+  @@index([createdAt])
+}
+
+model EventParticipationParticipant {
+  id                     String             @id @default(uuid())
+  eventParticipationId   String
+  eventParticipation     EventParticipation   @relation(fields: [eventParticipationId], references: [id], onDelete: Cascade)
+  fullName               String
+  characterId            String?
+  character              Character?         @relation("EventParticipationParticipantCharacter", fields: [characterId], references: [id], onDelete: SetNull)
+  sortOrder              Int                 @default(0)
+
+  @@index([eventParticipationId])
+  @@index([characterId])
 }
 
 /// Configurable incentive amount per institutional rank (never hardcode amounts in code).

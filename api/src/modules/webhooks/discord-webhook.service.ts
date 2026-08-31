@@ -46,7 +46,8 @@ export class DiscordWebhookService implements OnModuleInit {
       `Discord webhooks → news:${this.hasWebhook(['discord.newsWebhookUrl'], ['DISCORD_NEWS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
         `applications:${this.hasWebhook(['discord.applicationsWebhookUrl'], ['DISCORD_APPLICATIONS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
         `announcements:${this.hasWebhook(['discord.announcementsWebhookUrl'], ['DISCORD_ANNOUNCEMENTS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
-        `shifts:${this.hasWebhook(['discord.shiftsWebhookUrl'], ['DISCORD_SHIFTS_WEBHOOK_URL']) ? 'on' : 'off'}`,
+        `shifts:${this.hasWebhook(['discord.shiftsWebhookUrl'], ['DISCORD_SHIFTS_WEBHOOK_URL']) ? 'on' : 'off'} ` +
+        `events:${this.hasWebhook(['discord.eventsWebhookUrl'], ['DISCORD_EVENTS_WEBHOOK_URL']) ? 'on' : 'off'}`,
     );
   }
 
@@ -100,6 +101,60 @@ export class DiscordWebhookService implements OnModuleInit {
     return this.send(webhookUrl, {
       username: 'SAED Incentives',
       embeds: [embed],
+    });
+  }
+
+  async sendEventParticipationEmbed(input: {
+    eventDate: string;
+    organizers: string;
+    payerFullName: string;
+    authorizingOfficerName: string;
+    saedLeadName: string;
+    participants: string[];
+    submittedByName: string;
+  }): Promise<boolean> {
+    const webhookUrl = this.resolveWebhookUrl(
+      ['discord.eventsWebhookUrl'],
+      ['DISCORD_EVENTS_WEBHOOK_URL'],
+    );
+    if (!webhookUrl) {
+      this.logger.warn(
+        'Events Discord webhook skipped: no webhook URL configured. ' +
+          'Set DISCORD_EVENTS_WEBHOOK_URL on the API service ' +
+          '(Railway → API → Variables), then redeploy.',
+      );
+      return false;
+    }
+
+    const participantList = input.participants.filter(Boolean).join('\n') || '—';
+
+    return this.send(webhookUrl, {
+      username: 'SAED Eventos',
+      embeds: [
+        {
+          title: 'Participación de evento',
+          color: SAED_BRAND_COLOR,
+          timestamp: new Date().toISOString(),
+          footer: { text: 'SAED Management System · Eventos' },
+          fields: [
+            { name: 'Día del evento', value: formatEventDate(input.eventDate), inline: true },
+            { name: 'Organizadores del evento', value: input.organizers, inline: false },
+            {
+              name: 'Persona encargada de abonar al SAED el evento',
+              value: input.payerFullName,
+              inline: false,
+            },
+            {
+              name: 'Alto mando que autorizó ir al evento',
+              value: input.authorizingOfficerName,
+              inline: true,
+            },
+            { name: 'Encargado del SAED del evento', value: input.saedLeadName, inline: true },
+            { name: 'SAED participantes en dicho evento', value: participantList, inline: false },
+            { name: 'Registrado por', value: input.submittedByName, inline: true },
+          ],
+        },
+      ],
     });
   }
 
@@ -418,4 +473,12 @@ function truncatePlainText(value: string, maxLength: number): string {
     return plain;
   }
   return `${plain.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function formatEventDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim());
+  if (!match) {
+    return value || '—';
+  }
+  return `${match[3]}/${match[2]}/${match[1]}`;
 }

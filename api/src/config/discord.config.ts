@@ -24,6 +24,7 @@ export default registerAs('discord', () => ({
   incentivesWebhookUrl: sanitizeHttpUrl(process.env.DISCORD_INCENTIVES_WEBHOOK_URL),
   newsWebhookUrl: sanitizeHttpUrl(process.env.DISCORD_NEWS_WEBHOOK_URL),
   applicationsWebhookUrl: sanitizeHttpUrl(process.env.DISCORD_APPLICATIONS_WEBHOOK_URL),
+  eventsWebhookUrl: sanitizeHttpUrl(process.env.DISCORD_EVENTS_WEBHOOK_URL),
   /** Shared fallback channel for news + applications announcements. */
   announcementsWebhookUrl: sanitizeHttpUrl(process.env.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL),
   publicAssetBaseUrl:
