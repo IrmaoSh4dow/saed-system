@@ -107,6 +107,10 @@ export function getApiErrorMessage(error, fallback = 'Ha ocurrido un error inesp
       .join(' ');
   }
 
+  if (!payload && (error?.code === 'ERR_NETWORK' || error?.message === 'Network Error')) {
+    return 'No se pudo conectar con la API. Si acabas de redesplegar, espera a que Nest termine de arrancar e inténtalo de nuevo.';
+  }
+
   if (typeof error?.message === 'string' && error.message.trim()) {
     return error.message;
   }

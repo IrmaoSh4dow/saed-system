@@ -25,6 +25,13 @@ import { SlowRequestInterceptor } from './common/interceptors/slow-request.inter
 export async function attachNestToServer(httpServer?: HttpServer): Promise<RequestHandler> {
   const logger = new Logger('NestBoot');
   const expressApp = express();
+  expressApp.set('etag', false);
+  expressApp.use((request, response, next) => {
+    if (!request.path.startsWith('/uploads')) {
+      response.setHeader('Cache-Control', 'no-store');
+    }
+    next();
+  });
 
   logger.log('NestFactory.create starting');
   const app = await NestFactory.create<NestExpressApplication>(

@@ -1,5 +1,36 @@
 import * as Joi from 'joi';
 
+/**
+ * Optional HTTP(S) URL. Never fail process boot: a pasted webhook with quotes
+ * or trailing whitespace used to take down login (Nest never became ready).
+ */
+function optionalHttpUrl() {
+  return Joi.string()
+    .optional()
+    .allow('')
+    .custom((value: unknown) => {
+      if (value == null || value === '') {
+        return '';
+      }
+      const cleaned = String(value)
+        .trim()
+        .replace(/^['"]+|['"]+$/g, '')
+        .trim();
+      if (!cleaned) {
+        return '';
+      }
+      try {
+        const parsed = new URL(cleaned);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return '';
+        }
+        return cleaned;
+      } catch {
+        return '';
+      }
+    });
+}
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(8080),
@@ -33,10 +64,10 @@ export const envValidationSchema = Joi.object({
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
-  DISCORD_SHIFTS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
-  DISCORD_INCENTIVES_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
-  DISCORD_NEWS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
-  DISCORD_APPLICATIONS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
-  DISCORD_ANNOUNCEMENTS_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
-  PUBLIC_ASSET_BASE_URL: Joi.string().uri().allow('').optional(),
+  DISCORD_SHIFTS_WEBHOOK_URL: optionalHttpUrl(),
+  DISCORD_INCENTIVES_WEBHOOK_URL: optionalHttpUrl(),
+  DISCORD_NEWS_WEBHOOK_URL: optionalHttpUrl(),
+  DISCORD_APPLICATIONS_WEBHOOK_URL: optionalHttpUrl(),
+  DISCORD_ANNOUNCEMENTS_WEBHOOK_URL: optionalHttpUrl(),
+  PUBLIC_ASSET_BASE_URL: optionalHttpUrl(),
 });

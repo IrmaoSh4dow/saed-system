@@ -81,6 +81,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  applyBootstrapCors(req, res);
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(
     JSON.stringify({
@@ -100,6 +108,34 @@ server.on('error', (error) => {
   console.error(JSON.stringify({ msg: 'server_listen_error', error: String(error) }));
   process.exit(1);
 });
+
+function applyBootstrapCors(req, res) {
+  const origin = req.headers.origin;
+  if (!origin) {
+    return;
+  }
+
+  const allowed = String(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((part) => {
+      const trimmed = part.trim().replace(/\/$/, '');
+      if (!trimmed) {
+        return '';
+      }
+      return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    })
+    .filter(Boolean);
+
+  if (!allowed.includes(origin) && !allowed.includes(origin.replace(/\/$/, ''))) {
+    return;
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.setHeader('Vary', 'Origin');
+}
 
 /**
  * Always HTTP 200 so Railway can complete the deploy; the body carries the
